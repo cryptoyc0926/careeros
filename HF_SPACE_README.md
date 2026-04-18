@@ -24,7 +24,7 @@ license: mit
 
 ## 想要自己的实例？
 
-- **本地部署**（推荐）：[GitHub 仓库](https://github.com/careeros/careeros)
+- **本地部署**（推荐）：[GitHub 仓库](https://github.com/cryptoyc0926/careeros)
 - **Fork 此 Space** → 改成你自己的 HF Space（完全免费）
 
 ## 功能
@@ -35,4 +35,4 @@ license: mit
 - 💬 STAR 故事库 + 八股题 + 群面题
 - 📧 内推/投递邮件模板一键生成
 
-[查看完整 README](https://github.com/careeros/careeros/blob/main/README.md)
+[查看完整 README](https://github.com/cryptoyc0926/careeros/blob/main/README.md)

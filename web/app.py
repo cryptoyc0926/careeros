@@ -611,7 +611,7 @@ if settings.demo_mode:
         '<b>在线 Demo（BYO-Key 模式）</b> · '
         '这是公开演示实例。请在「系统设置」填入<b>你自己的</b> Claude API Key 才能生成内容；'
         '作者不会保存你的任何数据。想长期使用请 '
-        '<a href="https://github.com/careeros/careeros" target="_blank" style="color:#0071e3;text-decoration:none">自部署本地版</a>。'
+        '<a href="https://github.com/cryptoyc0926/careeros" target="_blank" style="color:#0071e3;text-decoration:none">自部署本地版</a>。'
         '</div>',
         unsafe_allow_html=True,
     )

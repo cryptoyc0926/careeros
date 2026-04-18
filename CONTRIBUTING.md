@@ -7,7 +7,7 @@
 ## 开发环境
 
 ```bash
-git clone https://github.com/<YOUR_USERNAME>/careeros.git
+git clone https://github.com/cryptoyc0926/careeros.git
 cd careeros
 python -m venv venv && source venv/bin/activate
 pip install -r web/requirements.txt

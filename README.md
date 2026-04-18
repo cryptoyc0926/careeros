@@ -32,7 +32,7 @@
 
 ```bash
 # 1. Clone
-git clone https://github.com/<YOUR_USERNAME>/careeros.git
+git clone https://github.com/cryptoyc0926/careeros.git
 cd careeros
 
 # 2. 装依赖
@@ -75,7 +75,7 @@ streamlit run web/app.py
 
 点击下面的按钮 Fork 到你自己的 HuggingFace 账号，一键部署你自己的实例：
 
-[![Deploy to HF Spaces](https://huggingface.co/datasets/huggingface/badges/resolve/main/deploy-to-spaces-md.svg)](https://huggingface.co/spaces/new?template=<your_hf_username>/careeros)
+[![Deploy to HF Spaces](https://huggingface.co/datasets/huggingface/badges/resolve/main/deploy-to-spaces-md.svg)](https://huggingface.co/spaces/new?template=cryptoyc0926/careeros)
 
 > **BYO-Key（自带 Key）模式**：你用自己的 Anthropic API Key，作者不收任何费用也不保存你的任何数据。
 > 详细部署指南见 [DEPLOY.md](./DEPLOY.md)。

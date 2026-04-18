@@ -9,7 +9,7 @@
 **适合**：只给自己用；想充分利用本地 SQLite 数据持久化；想用 Playwright 抓 SPA 站点 JD。
 
 ```bash
-git clone https://github.com/<YOUR_USERNAME>/careeros.git
+git clone https://github.com/cryptoyc0926/careeros.git
 cd careeros
 
 python -m venv venv && source venv/bin/activate  # Windows: venv\Scripts\activate
@@ -69,7 +69,7 @@ playwright install chromium
 
 ```bash
 # 服务器上
-git clone https://github.com/<YOUR_USERNAME>/careeros.git
+git clone https://github.com/cryptoyc0926/careeros.git
 cd careeros
 docker build -t careeros .
 docker run -d \
