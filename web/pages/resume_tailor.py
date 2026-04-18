@@ -510,6 +510,29 @@ with tab_eval:
 
 
 with tab_preview:
+    # ── 诚实提示：新 PDF 不是原件排版 ─────────────────────────
+    alert_info(
+        "**预览说明**：下方「系统生成的新 PDF」使用 **CareerOS 内置模板**排版，"
+        "**不会保持你原简历的视觉样式**（字体/分栏/配色可能不同）。"
+        "如需 1:1 保持原简历排版，建议：复制上面的改写文字 → 回你原本的 Word/PPT/Canva 文件里手动替换。"
+        "顶部「原简历 PDF」作为参照对比。"
+    )
+
+    # ── 原 PDF（来自主简历页上传的 session_state）─────────────
+    _orig_pdf = st.session_state.get("uploaded_pdf_bytes")
+    if _orig_pdf:
+        import base64 as _b64
+        with st.expander(f"📄 你上传的原简历 PDF（{len(_orig_pdf):,} 字节）· 对照参考", expanded=False):
+            _b64_s = _b64.b64encode(_orig_pdf).decode()
+            st.markdown(
+                f'<iframe src="data:application/pdf;base64,{_b64_s}" '
+                f'width="100%" height="500px" style="border:1px solid rgba(29,29,31,0.08);border-radius:14px"></iframe>',
+                unsafe_allow_html=True,
+            )
+    else:
+        st.caption("（没上传过原 PDF · 去「主简历 → 上传文件」上传后，这里可以看到原件对照）")
+
+    st.markdown("##### 🎨 系统生成的新 PDF（基于模板）")
 
     try:
         pdf_bytes = resume_renderer.render_pdf_bytes(st.session_state.tailor_data)

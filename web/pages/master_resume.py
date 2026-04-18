@@ -168,7 +168,7 @@ if "master_data" not in st.session_state:
 
 m = st.session_state.master_data
 
-top_col1, top_col2, top_col3 = st.columns([1, 1, 3])
+top_col1, top_col2, top_col3, top_col4 = st.columns([1, 1, 1.2, 2.5])
 with top_col1:
     if st.button("重新加载", use_container_width=True):
         st.session_state.master_data = load_master()
@@ -176,11 +176,43 @@ with top_col1:
 with top_col2:
     if st.button("保存全部", type="primary", use_container_width=True):
         save_master(st.session_state.master_data)
-        alert_success("已写入数据库")
         st.session_state.master_data = load_master()
+        st.session_state["_just_saved"] = True
         st.rerun()
 with top_col3:
-    st.caption(f"DB: `{Path(DB_PATH).name}` · record_id: {m.get('id') or '（新建）'}")
+    # 导出当前主简历为 JSON
+    _export_payload = {
+        "schema": "careeros.resume_master",
+        "exported_at": __import__("datetime").datetime.now().isoformat(timespec="seconds"),
+        "data": st.session_state.master_data,
+    }
+    st.download_button(
+        "📥 导出 JSON",
+        data=json.dumps(_export_payload, ensure_ascii=False, indent=2),
+        file_name=f"master_resume_{__import__('datetime').datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+        mime="application/json",
+        use_container_width=True,
+        help="把当前主简历导出为 JSON 文件，下次可在「系统设置 → 数据备份」里导入",
+    )
+with top_col4:
+    # 当前数据摘要
+    n_proj = len(m.get("projects") or [])
+    n_intern = len(m.get("internships") or [])
+    n_skills = len(m.get("skills") or [])
+    n_edu = len(m.get("education") or [])
+    name = (m.get("basics") or {}).get("name", "") or "（未填）"
+    summary = f"姓名：{name} · {n_proj} 项目 / {n_intern} 实习 / {n_skills} 技能 / {n_edu} 教育"
+    st.caption(f"DB: `{Path(DB_PATH).name}` · record_id: {m.get('id') or '（新建）'} · {summary}")
+
+# 保存成功提示（在 rerun 后显示）
+if st.session_state.pop("_just_saved", False):
+    n_proj = len(m.get("projects") or [])
+    n_intern = len(m.get("internships") or [])
+    alert_success(
+        f"✓ 已写入数据库（record_id: {m.get('id')}）· "
+        f"{n_proj} 项目 · {n_intern} 实习 · {len(m.get('skills') or [])} 技能 · {len(m.get('education') or [])} 教育。"
+        f"现在去「**在线定制编辑**」可以用这份主简历生成定制版。"
+    )
 
 divider()
 
@@ -401,15 +433,34 @@ with tab_upload:
                         with st.spinner("规则解析中..."):
                             parsed = rule_parse(text)
                         _apply_parsed(parsed)
-                        alert_success(
-                            f"✓ 规则解析完成。识别到 "
-                            f"姓名「{parsed['basics'].get('name') or '未识别'}」· "
-                            f"{len(parsed['projects'])} 个项目 · "
-                            f"{len(parsed['internships'])} 段经历 · "
-                            f"{len(parsed['skills'])} 类技能 · "
-                            f"{len(parsed['education'])} 段教育。"
-                            f"**切到其他 tab 校对；顶部「保存全部」才真正落库。**"
+
+                        # 规则解析质量自检
+                        n_proj = len(parsed.get('projects', []))
+                        n_intern = len(parsed.get('internships', []))
+                        n_skills = len(parsed.get('skills', []))
+                        n_edu = len(parsed.get('education', []))
+                        name_ok = bool(parsed['basics'].get('name'))
+                        low_quality = (not name_ok) or (n_proj + n_intern == 0) or (n_edu == 0)
+
+                        summary = (
+                            f"识别到 姓名「{parsed['basics'].get('name') or '未识别'}」· "
+                            f"{n_proj} 个项目 · {n_intern} 段经历 · {n_skills} 类技能 · {n_edu} 段教育"
                         )
+
+                        if low_quality:
+                            # 关键字段缺失 → 显著提示用户切到 AI 兜底
+                            st.session_state["_rule_parse_low_quality"] = True
+                            alert_warning(
+                                f"⚠️ 规则解析识别率较低。{summary}。\n\n"
+                                f"**建议点右侧「🤖 AI 智能解析」用 Claude 兜底**"
+                                f"（规则解析对非标准格式简历覆盖有限）。"
+                            )
+                        else:
+                            st.session_state["_rule_parse_low_quality"] = False
+                            alert_success(
+                                f"✓ 规则解析完成。{summary}。"
+                                f"**切到其他 tab 校对；顶部「保存全部」才真正落库。**"
+                            )
                         st.rerun()
                     except Exception as e:
                         alert_danger(f"规则解析失败：{type(e).__name__}: {e}")
