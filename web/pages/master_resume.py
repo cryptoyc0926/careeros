@@ -338,15 +338,52 @@ with tab_skills:
 
 # ── 上传解析 ────────────────────────────────────────────────
 with tab_upload:
-    st.markdown("上传 PDF / DOCX / TXT，系统只做文本提取供参考，**不会自动写入主简历**。")
+    st.markdown("上传 PDF / DOCX / TXT 简历，**AI 会自动识别并填入下方各个 tab 的字段**，你只需校对和微调。")
     f = st.file_uploader("选择文件", type=["pdf", "docx", "txt", "md"])
     if f:
         st.caption(f"{f.name}  |  {f.size:,} 字节")
-        with st.spinner("解析中..."):
+        with st.spinner("提取文本..."):
             text = extract_resume_text(f)
         if text:
-            alert_success(f"提取 {len(text):,} 字符")
-            st.text_area("提取内容（只读）", value=text, height=400, disabled=True)
+            alert_success(f"文本提取完成（{len(text):,} 字符）。点下面按钮让 AI 结构化。")
+
+            col_ai, _ = st.columns([1, 3])
+            with col_ai:
+                if st.button("🤖 AI 智能解析并填入字段", type="primary", key="ai_parse_resume",
+                             disabled=not settings.has_anthropic_key,
+                             help="AI 识别姓名/经历/项目/技能/教育后自动填到各 tab；耗费约 1-2 次 API 调用"):
+                    try:
+                        from services.resume_parser import parse_resume_text
+                        with st.spinner("AI 解析中（约 10-30 秒）..."):
+                            parsed = parse_resume_text(text)
+                        # 把解析结果写入 session_state.master_data（让其他 tab 能读到）
+                        _existing = st.session_state.get("master_data", {}) or {}
+                        st.session_state.master_data = {
+                            "id":          _existing.get("id"),
+                            "basics":      parsed["basics"],
+                            "profile":     {"pool": [{"id": "default", "tags": [], "text": parsed["profile"] or ""}], "default": "default"},
+                            "projects":    parsed["projects"],
+                            "internships": parsed["internships"],
+                            "skills":      parsed["skills"],
+                            "education":   parsed["education"],
+                        }
+                        alert_success(
+                            f"✓ AI 解析完成。识别到 "
+                            f"{len(parsed['projects'])} 个项目 · "
+                            f"{len(parsed['internships'])} 段实习 · "
+                            f"{len(parsed['skills'])} 类技能 · "
+                            f"{len(parsed['education'])} 段教育。"
+                            f"切到其他 tab 检查内容，**最后点顶部「保存全部」才会真正落库**。"
+                        )
+                        st.rerun()
+                    except Exception as e:
+                        alert_danger(f"解析失败：{type(e).__name__}: {e}")
+
+            if not settings.has_anthropic_key:
+                st.caption("⚠️ 需要先在「系统设置」填 API Key 才能启用 AI 解析。")
+
+            with st.expander("查看原始提取文本", expanded=False):
+                st.text_area("提取内容（只读）", value=text, height=300, disabled=True, label_visibility="collapsed")
 
 
 # ── 底部全局提示 ────────────────────────────────────────────
