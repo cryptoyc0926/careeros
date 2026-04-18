@@ -635,7 +635,6 @@ pages = {
     ],
     "简历管理": [
         st.Page("pages/master_resume.py",  title="主简历"),
-        st.Page("pages/generate.py",       title="AI 一键生成"),
         st.Page("pages/resume_tailor.py",  title="在线定制编辑"),
         st.Page("pages/star_pool.py",      title="经历素材库"),
     ],

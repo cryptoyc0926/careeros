@@ -67,23 +67,13 @@ def search_and_extract(
     Raises:
         RuntimeError: API 未配置 / 调用失败 / 返回不是合法 JSON
     """
-    try:
-        from anthropic import Anthropic
-    except ImportError as e:
-        raise RuntimeError("缺少 anthropic SDK") from e
-
+    from services.llm_client import make_client, friendly_error
     from config import settings
-
-    if not settings.has_anthropic_key:
-        raise RuntimeError("API Key 未配置")
 
     if not keywords:
         raise RuntimeError("请至少输入一个关键词")
 
-    client_kwargs = {"api_key": settings.anthropic_api_key}
-    if settings.anthropic_base_url:
-        client_kwargs["base_url"] = settings.anthropic_base_url
-    client = Anthropic(**client_kwargs)
+    client = make_client()
 
     user_brief = (
         f"## 搜索关键词\n{', '.join(keywords)}\n\n"
@@ -119,9 +109,9 @@ def search_and_extract(
                     messages=[{"role": "user", "content": user_brief}],
                 )
             except Exception as e2:
-                raise RuntimeError(f"API 调用失败：{type(e2).__name__}: {e2}") from e2
+                raise RuntimeError(friendly_error(e2)) from e2
         else:
-            raise RuntimeError(f"API 调用失败：{type(e).__name__}: {e}") from e
+            raise RuntimeError(friendly_error(e)) from e
 
     # 拼接所有文本 content block（AI 可能会先做多轮 tool_use）
     reply = ""

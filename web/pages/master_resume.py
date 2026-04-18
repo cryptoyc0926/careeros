@@ -159,7 +159,7 @@ page_header(
     "主简历",
     subtitle="维护你的底稿，让每次定制都更轻松",
     right_text="生成简历",
-    right_page="pages/generate.py",
+    right_page="pages/resume_tailor.py",
 )
 
 # session state 初始化
@@ -183,6 +183,25 @@ with top_col3:
     st.caption(f"DB: `{Path(DB_PATH).name}` · record_id: {m.get('id') or '（新建）'}")
 
 divider()
+
+# ── 原 PDF 预览（上传后的参照）─────────────────────────────
+if st.session_state.get("uploaded_pdf_bytes"):
+    import base64 as _b64
+    pdf_name = st.session_state.get("uploaded_pdf_name", "resume.pdf")
+    pdf_bytes = st.session_state["uploaded_pdf_bytes"]
+    _b64_data = _b64.b64encode(pdf_bytes).decode()
+    with st.expander(f"📄 原简历 PDF 预览（{pdf_name} · {len(pdf_bytes):,} 字节）· 点击展开", expanded=False):
+        st.markdown(
+            f'<iframe src="data:application/pdf;base64,{_b64_data}" '
+            f'width="100%" height="600px" style="border:1px solid rgba(29,29,31,0.08);border-radius:14px"></iframe>',
+            unsafe_allow_html=True,
+        )
+        col_clear, _ = st.columns([1, 4])
+        with col_clear:
+            if st.button("清除 PDF 缓存", key="clear_pdf_cache"):
+                st.session_state.pop("uploaded_pdf_bytes", None)
+                st.session_state.pop("uploaded_pdf_name", None)
+                st.rerun()
 
 tab_basics, tab_profile, tab_projects, tab_intern, tab_skills, tab_edu, tab_upload = st.tabs(
     ["基本信息", "个人总结", "项目经历", "实习经历", "技能证书", "教育背景", "上传文件"]
@@ -346,6 +365,12 @@ with tab_upload:
     f = st.file_uploader("选择文件", type=["pdf", "docx", "txt", "md"])
     if f:
         st.caption(f"{f.name}  |  {f.size:,} 字节")
+        # 保存原 PDF bytes 到 session_state 供顶部预览使用
+        if f.name.lower().endswith(".pdf"):
+            f.seek(0)
+            st.session_state["uploaded_pdf_bytes"] = f.read()
+            st.session_state["uploaded_pdf_name"] = f.name
+            f.seek(0)
         with st.spinner("提取文本..."):
             text = extract_resume_text(f)
         if text:

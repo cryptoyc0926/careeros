@@ -239,20 +239,18 @@ col_test, _ = st.columns([1, 3])
 with col_test:
     if st.button("测试连接", disabled=not settings.has_anthropic_key, help="发送一次最小 API 调用，验证 Key / 端点 / 模型是否可用"):
         try:
-            from anthropic import Anthropic
-            client_kwargs = {"api_key": settings.anthropic_api_key}
-            if settings.has_custom_base_url:
-                client_kwargs["base_url"] = settings.anthropic_base_url
-            client = Anthropic(**client_kwargs)
+            from services.llm_client import make_client, friendly_error
+            client = make_client()
             resp = client.messages.create(
                 model=settings.claude_model,
                 max_tokens=16,
                 messages=[{"role": "user", "content": "ping"}],
             )
-            reply = resp.content[0].text if resp.content else ""
+            reply = resp.content[0].text if resp.content else "(空响应，但连接成功)"
             alert_success(f"✓ 连接成功 · 模型 `{settings.claude_model}` 可用 · 回复：{reply[:40]}")
         except Exception as e:
-            alert_danger(f"✗ 连接失败：{type(e).__name__} · {str(e)[:200]}")
+            from services.llm_client import friendly_error
+            alert_danger(f"✗ {friendly_error(e)}")
 
 # ── SMTP 邮件配置 ─────────────────────────────────────────
 divider()

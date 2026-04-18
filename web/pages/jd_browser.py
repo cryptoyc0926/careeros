@@ -238,7 +238,7 @@ for row in rows:
                 with dc2:
                     if st.button("生成简历", key=f"gen_{row['id']}"):
                         st.session_state["target_jd_id"] = row["id"]
-                        st.switch_page("pages/generate.py")
+                        st.switch_page("pages/resume_tailor.py")
                 with dc3:
                     if st.button("收起", key=f"close_{row['id']}"):
                         del st.session_state["detail_jd_id"]

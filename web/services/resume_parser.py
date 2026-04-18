@@ -63,33 +63,26 @@ def parse_resume_text(raw_text: str) -> dict:
     Raises:
         RuntimeError: API 未配置、API 调用失败、返回不是合法 JSON
     """
-    try:
-        from anthropic import Anthropic
-    except ImportError as e:
-        raise RuntimeError("缺少 anthropic SDK") from e
-
+    from services.llm_client import make_client, friendly_error
     from config import settings
-
-    if not settings.has_anthropic_key:
-        raise RuntimeError("API Key 未配置，请先在「系统设置」填入 Key")
 
     if not raw_text or len(raw_text.strip()) < 50:
         raise RuntimeError(f"文本太短（{len(raw_text)} 字符），无法解析")
 
-    client_kwargs = {"api_key": settings.anthropic_api_key}
-    if settings.anthropic_base_url:
-        client_kwargs["base_url"] = settings.anthropic_base_url
-    client = Anthropic(**client_kwargs)
+    client = make_client()
 
-    resp = client.messages.create(
-        model=settings.claude_model,
-        max_tokens=4096,
-        system=PARSE_SYSTEM,
-        messages=[{
-            "role": "user",
-            "content": f"以下是简历原文，请按 schema 输出 JSON：\n\n{raw_text}",
-        }],
-    )
+    try:
+        resp = client.messages.create(
+            model=settings.claude_model,
+            max_tokens=4096,
+            system=PARSE_SYSTEM,
+            messages=[{
+                "role": "user",
+                "content": f"以下是简历原文，请按 schema 输出 JSON：\n\n{raw_text}",
+            }],
+        )
+    except Exception as e:
+        raise RuntimeError(friendly_error(e)) from e
 
     reply = ""
     for block in resp.content:

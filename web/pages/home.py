@@ -137,7 +137,7 @@ with view_col:
 apple_section_heading("常用入口")
 
 cards = [
-    ("AI 生成简历",  "选一个岗位，输出一份量身定制的简历",         "pages/generate.py"),
+    ("简历定制",     "选一个岗位，在线编辑生成量身定制的简历",      "pages/resume_tailor.py"),
     ("进度追踪",     "看板视图，追踪每个岗位从投递到 Offer",        "pages/pipeline.py"),
     ("面试准备",     "用 AI 模拟问答，也把公司情报准备好",          "pages/interview.py"),
 ]

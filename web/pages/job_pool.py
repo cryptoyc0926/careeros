@@ -265,7 +265,7 @@ if view == "紧凑列表":
                     elif not has_resume:
                         if st.button("生成简历", key=f"gen{job_id}", help="AI 按此 JD 定制简历"):
                             st.session_state["target_jd_id"] = jd_id
-                            st.switch_page("pages/generate.py")
+                            st.switch_page("pages/resume_tailor.py")
                     elif has_resume:
                         st.caption("已完成")
             with r5:

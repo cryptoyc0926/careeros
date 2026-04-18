@@ -65,14 +65,78 @@ _ROLE_PATTERN = re.compile(
     r"(?P<role>[\w\s\u4e00-\u9fa5]*?(?:" + "|".join(re.escape(k) for k in _ROLE_KEYWORDS) + r")[\w\s\u4e00-\u9fa5\(\)（）]*)\s*$"
 )
 
+# 公司/机构识别关键词（用于判断 header 里"公司段"的位置）
+_COMPANY_KEYWORDS = [
+    # 中文企业后缀
+    "有限公司", "股份公司", "股份有限公司", "集团", "公司", "科技", "交易所",
+    "基金", "实验室", "研究院", "工作室", "研究所", "中心",
+    "银行", "金融", "学院", "学校",
+    # 英文企业后缀
+    "Inc", "Ltd", "Corp", "LLC", "Group", "Labs", "Technologies", "Holdings",
+]
+_COMPANY_KEYWORDS.sort(key=len, reverse=True)
+
+# 学校识别关键词（教育章节用于判断 school/major 哪个是学校）
+_SCHOOL_KEYWORDS = [
+    "大学", "学院", "学校", "University", "College", "Institute", "School",
+]
+_SCHOOL_KEYWORDS.sort(key=len, reverse=True)
+
+
+def _pick_school_major(candidates: list[str]) -> tuple[str, str]:
+    """从 2 段候选里判断谁是学校、谁是专业。
+
+    启发式：含"大学/学院/学校/University/College"等关键词的归为 school，另一段是 major。
+    如果两段都含或都不含 → 保持原顺序（第 1 段 school, 第 2 段 major）。
+    """
+    if not candidates:
+        return "", ""
+    if len(candidates) == 1:
+        return candidates[0], ""
+
+    a, b = candidates[0], candidates[1]
+    a_low, b_low = a.lower(), b.lower()
+    a_is_school = any(kw.lower() in a_low for kw in _SCHOOL_KEYWORDS)
+    b_is_school = any(kw.lower() in b_low for kw in _SCHOOL_KEYWORDS)
+
+    if b_is_school and not a_is_school:
+        return b, a  # 颠倒
+    return a, b  # 保持顺序
+
+
+def _find_kw_hits(text: str, keywords: list[str]) -> list[tuple[int, int, str]]:
+    """返回文本中所有命中关键词的位置：[(start_pos, end_pos, keyword), ...]"""
+    hits: list[tuple[int, int, str]] = []
+    lo = text.lower()
+    for kw in keywords:
+        kl = kw.lower()
+        start = 0
+        while True:
+            idx = lo.find(kl, start)
+            if idx < 0:
+                break
+            hits.append((idx, idx + len(kl), kw))
+            start = idx + 1
+    return hits
+
 # 章节标题关键词
 SECTIONS = {
-    "basics":      ["个人信息", "基本信息", "联系方式"],
-    "profile":     ["个人总结", "个人简介", "自我评价", "自我介绍", "个人评价", "自评", "Summary", "About Me"],
-    "education":   ["教育背景", "教育经历", "学习经历", "教育", "Education"],
-    "projects":    ["项目经历", "项目经验", "项目", "主要项目", "核心项目", "Projects", "Project Experience"],
-    "internships": ["实习经历", "实习经验", "工作经历", "工作经验", "实习", "工作", "Internship", "Work Experience", "Experience"],
-    "skills":      ["核心技能", "专业技能", "技能证书", "技能", "技术栈", "工具", "Skills", "Technical Skills"],
+    "basics":      ["个人信息", "基本信息", "联系方式", "基础信息"],
+    "profile":     [
+        "个人总结", "个人简介", "自我评价", "自我介绍", "个人评价", "自评",
+        "概述", "简介", "Summary", "About Me", "Profile",
+    ],
+    "education":   ["教育背景", "教育经历", "学习经历", "教育", "学历", "Education"],
+    "projects":    ["项目经历", "项目经验", "项目", "主要项目", "核心项目", "作品集", "Projects", "Project Experience"],
+    "internships": [
+        "实习经历", "实习经验", "工作经历", "工作经验", "职业经历", "职业经验",
+        "实习", "工作", "Internship", "Work Experience", "Experience",
+    ],
+    "skills":      [
+        "核心技能", "专业技能", "技能证书", "技能", "技术栈", "工具",
+        "个人能力", "其他技能", "语言能力", "语言技能", "兴趣爱好", "证书", "资格证书",
+        "Skills", "Technical Skills", "Languages", "Certifications",
+    ],
 }
 
 _MAX_HEADING_LEN = 20
@@ -289,15 +353,19 @@ def _parse_items(lines: list[str]) -> list[dict]:
 def _split_company_role(text: str) -> tuple[str, str]:
     """拆 header 文本 → (company, role)。
 
-    策略（按优先级）：
+    v3 策略（支持双向顺序）：
     1. 显式分隔符 | ｜ · • — – /
-    2. 职位关键词定位：找到**最左、最长**的关键词位置，从该位置往前找最后一个空格作为 company/role 分隔
-    3. 都失败：整段当 company
+    2. 同时找 role 关键词和 company 关键词的位置
+    3. 根据两者相对位置判断顺序：
+       - company 在前 role 在后：`AI Trading 社区搭建 用户增长运营`
+       - role 在前 company 在后：`数据运营实习生 WEEX 交易所`
+    4. 无 company 关键词命中时：按"公司在前职位在后"的传统约定切（从 role 位置往前找空格）
+    5. 关键词在开头 → 整段是 role
     """
     if not text:
         return "", ""
 
-    # 1. 显式分隔符（长的先试）
+    # 1. 显式分隔符
     for sep in ["|", "｜", " - ", " — ", " – ", " / "]:
         if sep in text:
             parts = [p.strip() for p in text.split(sep, 1) if p.strip()]
@@ -310,35 +378,79 @@ def _split_company_role(text: str) -> tuple[str, str]:
             if len(parts) == 2 and parts[0] and parts[1]:
                 return parts[0], parts[1]
 
-    # 2. 职位关键词定位
-    # 找所有关键词出现位置，排序：位置升序 + 长度降序（同位置取长关键词）
-    hits: list[tuple[int, int, str]] = []  # (pos, -len, keyword)
-    lo = text.lower()
-    for kw in _ROLE_KEYWORDS:
-        idx = lo.find(kw.lower())
-        if idx >= 0:
-            hits.append((idx, -len(kw), kw))
-    if hits:
-        hits.sort()
-        role_hit_pos = hits[0][0]
-        # 从命中位置往前找最后一个空格（company/role 分界）
-        split_pos = text.rfind(" ", 0, role_hit_pos)
+    # 2. 找 role 关键词 + company 关键词位置
+    role_hits = _find_kw_hits(text, _ROLE_KEYWORDS)
+    role_hits.sort(key=lambda h: (h[0], -(h[1] - h[0])))  # 位置升序 + 长度降序
+    company_hits = _find_kw_hits(text, _COMPANY_KEYWORDS)
+    company_hits.sort(key=lambda h: (h[0], -(h[1] - h[0])))
+
+    if role_hits and company_hits:
+        role_start, role_end, _ = role_hits[0]
+        comp_start, comp_end, _ = company_hits[0]
+
+        # Case A: role 在前 company 在后 → "职位 公司" 顺序
+        if role_start < comp_start:
+            # 从 role_end 到 comp_start 范围内找**最左**空格作为分界
+            # （这样 role 段最短；company 段包含完整公司名 + 前缀如"WEEX"）
+            split_pos = text.find(" ", role_end, comp_start)
+            if split_pos < 0:
+                # 罕见：role 和 company 之间没空格 → 用关键词边界切
+                split_pos = comp_start
+                role_txt = text[:split_pos].strip(" ,，、:：-·—–")
+                company_txt = text[split_pos:].strip()
+            else:
+                role_txt = text[:split_pos].strip(" ,，、:：-·—–")
+                company_txt = text[split_pos + 1:].strip()
+            if role_txt and company_txt:
+                return company_txt, role_txt
+
+        # Case B: company 在前 role 在后 → "公司 职位" 传统顺序
+        else:
+            split_pos = text.rfind(" ", comp_end, role_start)
+            if split_pos < 0:
+                split_pos = role_start - 1 if role_start > comp_end else comp_end
+            company_txt = text[:split_pos].strip(" ,，、:：-·—–")
+            role_txt = text[split_pos + 1:].strip()
+            if company_txt and role_txt:
+                return company_txt, role_txt
+
+    # 3. 只有 role 关键词（没公司词）→ 默认 "公司 职位" 顺序，从 role 位置往前找空格
+    if role_hits:
+        role_start = role_hits[0][0]
+        split_pos = text.rfind(" ", 0, role_start)
         if split_pos > 0:
-            # 空格后从 split_pos+1 开始是 role；但如果 role 起点还不到关键词位置（有额外前缀如"海外"），把前缀也归 role
             company = text[:split_pos].strip(" ,，、:：-·—–")
             role = text[split_pos + 1:].strip()
             if company and role:
                 return company, role
-        # 没空格 / 空格在 0 位：把关键词位置当分界
-        if role_hit_pos > 0:
-            company = text[:role_hit_pos].strip(" ,，、:：-·—–")
-            role = text[role_hit_pos:].strip()
-            if company and role:
-                return company, role
-        # 关键词在开头 → 整段是 role
-        return "", text.strip()
+        # 关键词在最左：整段是 role
+        if role_start == 0:
+            return "", text.strip()
+        # 没空格但关键词不在最左：按关键词位置切
+        company = text[:role_start].strip(" ,，、:：-·—–")
+        role = text[role_start:].strip()
+        if company and role:
+            return company, role
 
-    # 3. 兜底
+    # 4. 只有 company 关键词（没 role）→ 默认公司在前，剩余当 role
+    if company_hits:
+        comp_end = company_hits[-1][1]  # 取最后一个 company 词的词尾
+        # 从 comp_end 之后的内容是 role
+        after = text[comp_end:].strip(" ,，、:：-·—–")
+        before_and_self = text[:comp_end].strip(" ,，、:：-·—–")
+        if after:
+            return before_and_self, after
+        # company 在末尾 → 前缀是 role
+        if comp_end < len(text):
+            pass  # 已处理
+        split_pos = text.rfind(" ", 0, company_hits[0][0])
+        if split_pos > 0:
+            role_pre = text[:split_pos].strip(" ,，、:：-·—–")
+            company = text[split_pos + 1:].strip()
+            if role_pre and company:
+                return company, role_pre
+
+    # 5. 兜底：整段当 company
     return text.strip(), ""
 
 
@@ -422,14 +534,21 @@ def _parse_education(lines: list[str]) -> list[dict]:
             left_right = _DATE_RANGE_RE.sub("|", ln)  # 用 | 占位日期那段
             # 按 | 切所有段
             parts = [p.strip(" ·,，、:：-—–") for p in re.split(r"[|｜]", left_right) if p.strip(" ·,，、:：-—–")]
-            school = parts[0] if len(parts) > 0 else ""
-            major = parts[1] if len(parts) > 1 else ""
-            bullets_tail = parts[2:]  # 日期后面的内容（已被 | 替代所以顺序变了）
-            # 如果没有 | 分隔，尝试空格拆
-            if not major and school:
-                sp = school.split(None, 1)
+
+            # 没分隔符时把单段用空格切
+            if len(parts) == 1:
+                single = parts[0]
+                # 先尝试按空格切成两段
+                sp = single.rsplit(None, 1)  # 从右侧切一次（最后一段可能是学校）
                 if len(sp) == 2:
-                    school, major = sp[0], sp[1]
+                    parts = sp
+                else:
+                    parts = [single]
+
+            # school/major 启发式：谁含"大学/学院/学校"谁是 school
+            school, major = _pick_school_major(parts[:2]) if len(parts) >= 2 else (parts[0] if parts else "", "")
+            bullets_tail = parts[2:]
+
             current = {
                 "school": school,
                 "major": major,
