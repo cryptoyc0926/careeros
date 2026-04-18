@@ -107,46 +107,102 @@ def _write_env(env_vars: dict):
     env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-# ── Claude API 配置 ───────────────────────────────────────
-apple_section_heading("Claude API 配置")
+# ── LLM API 配置（多 Provider）──────────────────────────
+apple_section_heading("大模型 API 配置", subtitle="支持 Claude / Kimi / 智谱 GLM / DeepSeek 等多家 Anthropic 兼容端点")
 
 current_env = _read_env()
 
+_PROVIDERS = {
+    "anthropic": {
+        "label":     "Claude (Anthropic 官方)",
+        "base_url":  "",
+        "model":     "claude-sonnet-4-6",
+        "key_link":  "https://console.anthropic.com/",
+        "hint":      "免费 $5 额度；支持所有最新 Claude 模型。",
+    },
+    "kimi": {
+        "label":     "Kimi (月之暗面)",
+        "base_url":  "https://api.moonshot.cn/anthropic",
+        "model":     "kimi-k2-0905-preview",
+        "key_link":  "https://platform.moonshot.cn/console/api-keys",
+        "hint":      "国内访问稳定；长上下文支持；需充值。",
+    },
+    "glm": {
+        "label":     "智谱 GLM-4.6",
+        "base_url":  "https://open.bigmodel.cn/api/anthropic",
+        "model":     "glm-4.6",
+        "key_link":  "https://bigmodel.cn/usercenter/apikeys",
+        "hint":      "国产大模型；Anthropic 兼容 API；新用户送额度。",
+    },
+    "deepseek": {
+        "label":     "DeepSeek",
+        "base_url":  "https://api.deepseek.com/anthropic",
+        "model":     "deepseek-chat",
+        "key_link":  "https://platform.deepseek.com/api_keys",
+        "hint":      "性价比最高；推理能力强。",
+    },
+    "proxy": {
+        "label":     "自定义代理 / 其他兼容端点",
+        "base_url":  "",
+        "model":     "claude-sonnet-4-6",
+        "key_link":  "",
+        "hint":      "任何兼容 Anthropic API 的代理，自己填 base_url 和 model。",
+    },
+}
+
+_current_provider = current_env.get("LLM_PROVIDER", "anthropic").lower()
+if _current_provider not in _PROVIDERS:
+    _current_provider = "anthropic"
+
 with st.form("api_config"):
+    provider_keys = list(_PROVIDERS.keys())
+    provider = st.selectbox(
+        "选择 LLM Provider",
+        options=provider_keys,
+        index=provider_keys.index(_current_provider),
+        format_func=lambda k: _PROVIDERS[k]["label"],
+        help="选对应的大模型服务商，会自动填入 base_url 和默认模型名。",
+    )
+    _p = _PROVIDERS[provider]
+    st.caption(f"💡 {_p['hint']}" + (f" [申请 Key →]({_p['key_link']})" if _p["key_link"] else ""))
+
     api_key = st.text_input(
         "API Key",
         value=current_env.get("ANTHROPIC_API_KEY", ""),
         type="password",
-        help="Anthropic API Key 或自定义代理的 Key",
+        help="粘贴从上面链接申请到的 Key。所有 provider 都统一存到 ANTHROPIC_API_KEY 变量（SDK 要求）。",
     )
     base_url = st.text_input(
-        "API 端点（留空使用官方地址）",
-        value=current_env.get("ANTHROPIC_BASE_URL", ""),
-        help="自定义 API 代理地址，如 http://cccai.cfd",
+        "API 端点（base_url）",
+        value=current_env.get("ANTHROPIC_BASE_URL", "") or _p["base_url"],
+        help="留空用 Anthropic 官方。其他 provider 会自动填对应端点。",
+        placeholder=_p["base_url"] or "https://api.anthropic.com",
     )
     model = st.text_input(
         "模型名称",
-        value=current_env.get("CLAUDE_MODEL", "claude-opus-4-6"),
-        help="如 claude-opus-4-6, claude-sonnet-4-5-20250514 等",
+        value=current_env.get("CLAUDE_MODEL", "") or _p["model"],
+        help="每家 provider 的可用模型名不同，参考下面提示",
+        placeholder=_p["model"],
     )
 
     if st.form_submit_button("保存 API 配置", type="primary"):
+        current_env["LLM_PROVIDER"] = provider
         current_env["ANTHROPIC_API_KEY"] = api_key
         current_env["ANTHROPIC_BASE_URL"] = base_url
         current_env["CLAUDE_MODEL"] = model
         _write_env(current_env)
-        alert_success("API 配置已保存，重启应用后生效。")
-        st.caption("提示：Ctrl+C 停止 Streamlit，再重新运行 streamlit run app.py")
+        alert_success(f"配置已保存（Provider: {_p['label']}）。请重启应用后生效。")
 
 # 状态指示（用 badge 组件替代 emoji）
 if settings.has_anthropic_key:
+    _cur_p = _PROVIDERS.get(settings.llm_provider, _PROVIDERS["anthropic"])
     st.markdown(
         badge("已连接", "success") +
-        f' <span style="font-size:13px;color:#1d1d1f">{settings.masked_key(settings.anthropic_api_key)}</span>',
+        f' <span style="font-size:13px;color:#1d1d1f">{_cur_p["label"]} · {settings.masked_key(settings.anthropic_api_key)}</span>',
         unsafe_allow_html=True,
     )
     if settings.has_custom_base_url:
-        st.caption(f"自定义端点：{settings.anthropic_base_url}")
+        st.caption(f"端点：{settings.anthropic_base_url}")
     st.caption(f"当前模型：{settings.claude_model}")
 else:
     st.markdown(badge("未配置", "danger"), unsafe_allow_html=True)
@@ -202,16 +258,30 @@ else:
 
 # ── 文件路径 ──────────────────────────────────────────────
 divider()
-apple_section_heading("文件路径")
+apple_section_heading(
+    "系统文件路径",
+    subtitle="这些是 CareerOS 读写数据的实际位置，通常不需要改",
+)
 
-paths_data = {
-    "数据库": str(settings.db_full_path),
-    "主简历": str(settings.master_resume_full_path),
-    "输出目录": str(settings.output_full_path),
-    "项目根目录": str(settings.project_root),
-}
-for label, path in paths_data.items():
+alert_info(
+    "**这一栏在看什么？** CareerOS 是纯本地运行的，所有数据都存在下面这些路径里。"
+    "「存在」= 已经有该文件/目录；「不存在」= 还没创建（首次使用时正常，数据会在你操作后自动生成）。"
+    "云端部署（Streamlit Cloud / HF Space）重启后非持久化目录会丢数据，建议通过 UI 填的信息写回 GitHub 永久化。"
+)
+
+paths_data = [
+    ("数据库",    str(settings.db_full_path.resolve()),
+                  "SQLite 单文件，存储所有岗位、简历、投递、面试、素材等"),
+    ("主简历",    str(settings.master_resume_full_path.resolve()),
+                  "旧版 YAML 格式主简历（已被 DB 的 resume_master 表取代，可忽略）"),
+    ("输出目录",  str(settings.output_full_path.resolve()),
+                  "生成的定制简历 PDF / 求职信 / 导出文件存放处"),
+    ("项目根目录", str(settings.project_root.resolve()),
+                  "Streamlit 应用代码所在目录"),
+]
+for label, path, desc in paths_data:
     path_row_card(label, path, exists=Path(path).exists())
+    st.caption(f"　　↳ {desc}")
 
 # ── 数据库信息 ─────────────────────────────────────────────
 divider()

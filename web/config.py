@@ -32,19 +32,54 @@ _USER_PROFILE_EXAMPLE = (_ROOT.parent / "data" / "user_profile.example.yaml")
 class Settings:
     """Application settings loaded from environment / .env file."""
 
-    # ── Anthropic ────────────────────────────────────────────
+    # ── LLM Provider（统一抽象）──────────────────────────────
+    # 目前所有模型都通过 Anthropic SDK 调用。支持的 provider：
+    #   - anthropic (官方)
+    #   - kimi (月之暗面 — 走 Anthropic 兼容端点)
+    #   - glm (智谱 — 走 Anthropic 兼容端点)
+    #   - deepseek (DeepSeek — 走 Anthropic 兼容端点)
+    #   - proxy (自定义代理)
+    @property
+    def llm_provider(self) -> str:
+        return os.getenv("LLM_PROVIDER", "anthropic").lower()
+
     @property
     def anthropic_api_key(self) -> str:
+        # 多 provider 场景下，API Key 统一走 ANTHROPIC_API_KEY 变量（SDK 要求）
         return os.getenv("ANTHROPIC_API_KEY", "")
 
     @property
     def anthropic_base_url(self) -> str:
-        """自定义 API 端点（留空则使用 Anthropic 官方地址）"""
-        return os.getenv("ANTHROPIC_BASE_URL", "")
+        """自定义 API 端点。按 provider 提供预设：
+        - kimi:     https://api.moonshot.cn/anthropic
+        - glm:      https://open.bigmodel.cn/api/anthropic
+        - deepseek: https://api.deepseek.com/anthropic
+        留空则使用 Anthropic 官方。
+        """
+        explicit = os.getenv("ANTHROPIC_BASE_URL", "")
+        if explicit:
+            return explicit
+        # Provider 预设
+        presets = {
+            "kimi":     "https://api.moonshot.cn/anthropic",
+            "glm":      "https://open.bigmodel.cn/api/anthropic",
+            "deepseek": "https://api.deepseek.com/anthropic",
+        }
+        return presets.get(self.llm_provider, "")
 
     @property
     def claude_model(self) -> str:
-        return os.getenv("CLAUDE_MODEL", "claude-opus-4-6")
+        # 按 provider 给默认模型名
+        env_model = os.getenv("CLAUDE_MODEL", "")
+        if env_model:
+            return env_model
+        defaults = {
+            "anthropic": "claude-sonnet-4-6",
+            "kimi":      "kimi-k2-0905-preview",
+            "glm":       "glm-4.6",
+            "deepseek":  "deepseek-chat",
+        }
+        return defaults.get(self.llm_provider, "claude-sonnet-4-6")
 
     # ── Email (SMTP) ────────────────────────────────────────
     @property

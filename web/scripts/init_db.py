@@ -125,6 +125,170 @@ CREATE TABLE IF NOT EXISTS _migrations (
     name            TEXT    NOT NULL UNIQUE,
     applied_at      TEXT    DEFAULT (datetime('now'))
 );
+
+-- ══════════════════════════════════════════════════════════════
+-- 扩展业务表（历史遗留使用中文字段，保持不变以兼容代码 SQL）
+-- ══════════════════════════════════════════════════════════════
+
+-- 岗位池（核心表：所有页面依赖）
+CREATE TABLE IF NOT EXISTS jobs_pool (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    序号 INTEGER,
+    公司 TEXT NOT NULL,
+    岗位名称 TEXT NOT NULL,
+    城市 TEXT,
+    方向分类 TEXT,
+    等级 TEXT,
+    匹配分 REAL,
+    技能匹配 REAL,
+    经历相关 REAL,
+    面试概率 REAL,
+    成长价值 REAL,
+    投递档位 TEXT,
+    发布时间 TEXT,
+    时间等级 TEXT,
+    来源平台 TEXT,
+    链接 TEXT,
+    核心匹配点 TEXT,
+    短板 TEXT,
+    招聘类型 TEXT,
+    今日行动 TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status TEXT DEFAULT 'NEW',
+    link_type TEXT DEFAULT '门户入口',
+    applied_date TEXT,
+    apply_channel TEXT,
+    last_followup TEXT,
+    followup_count INTEGER DEFAULT 0,
+    credibility TEXT DEFAULT '中',
+    jd_fetch_mode TEXT DEFAULT 'auto',
+    jd_status TEXT DEFAULT 'pending',
+    jd_last_error TEXT,
+    jd_fetched_at TEXT
+);
+
+-- 主简历
+CREATE TABLE IF NOT EXISTS resume_master (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    basics_json     TEXT NOT NULL,
+    profile_json    TEXT NOT NULL,
+    projects_json   TEXT NOT NULL,
+    internships_json TEXT NOT NULL,
+    skills_json     TEXT NOT NULL,
+    education_json  TEXT NOT NULL,
+    updated_at      TEXT DEFAULT (datetime('now'))
+);
+
+-- 定制简历版本
+CREATE TABLE IF NOT EXISTS resume_versions (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    master_id       INTEGER NOT NULL,
+    job_pool_id     INTEGER,
+    target_role     TEXT,
+    version_name    TEXT,
+    content_json    TEXT NOT NULL,
+    match_score     INTEGER,
+    pdf_path        TEXT,
+    created_at      TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (master_id) REFERENCES resume_master(id),
+    FOREIGN KEY (job_pool_id) REFERENCES jobs_pool(id)
+);
+
+-- STAR 素材池
+CREATE TABLE IF NOT EXISTS star_pool (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bullet_text TEXT NOT NULL,
+    source_type TEXT NOT NULL,
+    source_company TEXT,
+    source_index INTEGER,
+    direction_tags TEXT,
+    outcome_tags TEXT,
+    impact TEXT DEFAULT 'mid',
+    approved INTEGER DEFAULT 0,
+    used_count INTEGER DEFAULT 0,
+    notes TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- STAR 故事库
+CREATE TABLE IF NOT EXISTS star_stories (
+    id INTEGER PRIMARY KEY,
+    title TEXT NOT NULL,
+    situation TEXT,
+    task TEXT,
+    action TEXT,
+    result TEXT,
+    tags TEXT,
+    used_count INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- JD 深度评估结果
+CREATE TABLE IF NOT EXISTS jd_evaluations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_pool_id INTEGER,
+    resume_version_id INTEGER,
+    jd_hash TEXT,
+    target_role TEXT,
+    overall_score INTEGER,
+    eval_json TEXT NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (resume_version_id) REFERENCES resume_versions(id)
+);
+
+-- 面试题库
+CREATE TABLE IF NOT EXISTS interview_qa (
+    id INTEGER PRIMARY KEY,
+    category TEXT NOT NULL,
+    question TEXT NOT NULL,
+    answer TEXT,
+    source_jd TEXT,
+    tags TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 联系人
+CREATE TABLE IF NOT EXISTS contacts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    company TEXT NOT NULL,
+    role TEXT DEFAULT '',
+    contact_type TEXT DEFAULT 'HR',
+    linkedin_url TEXT DEFAULT '',
+    maimai_id TEXT DEFAULT '',
+    email TEXT DEFAULT '',
+    priority TEXT DEFAULT 'P2',
+    status TEXT DEFAULT '待触达',
+    last_action TEXT DEFAULT '',
+    last_action_date TEXT DEFAULT '',
+    message_template TEXT DEFAULT '',
+    notes TEXT DEFAULT '',
+    verified_method TEXT DEFAULT 'WebSearch',
+    created_at TEXT DEFAULT (datetime('now','localtime')),
+    UNIQUE(name, company)
+);
+
+-- LinkedIn 线索（可选）
+CREATE TABLE IF NOT EXISTS linkedin_leads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    full_name TEXT NOT NULL,
+    first_name TEXT,
+    profile_url TEXT NOT NULL UNIQUE,
+    company TEXT,
+    title TEXT,
+    city TEXT,
+    persona TEXT,
+    priority INTEGER DEFAULT 2,
+    source TEXT,
+    status TEXT DEFAULT 'NEW',
+    greeting_lang TEXT,
+    greeting_rendered TEXT,
+    discovered_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    last_updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    notes TEXT
+);
 """
 
 INDEXES_SQL = """
