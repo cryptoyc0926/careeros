@@ -48,7 +48,7 @@ def _apply_filters(df, priorities, statuses, keyword):
 
 df_all = _load_all()
 if df_all.empty:
-    empty_state("", "岗位池为空", "运行 job-scanner 添加岗位")
+    empty_state("", "岗位池为空", "点左侧「添加岗位 JD」粘贴一个职位链接或描述即可开始")
     st.stop()
 
 active = df_all[df_all["status"] != "已排除"]

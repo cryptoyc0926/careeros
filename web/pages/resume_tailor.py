@@ -75,7 +75,7 @@ def flatten_master_for_render(master: dict) -> dict:
 
 master = load_master()
 if not master:
-    alert_danger("resume_master 表为空。请先执行 `python scripts/seed_resume_master.py`。")
+    alert_info("主简历还没创建。请先到左侧「**主简历**」页面填写基本信息和经历，再回来使用定制功能。")
     st.stop()
 
 
