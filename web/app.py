@@ -595,11 +595,17 @@ footer { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ── 首次运行时自动初始化数据库 ─────────────────────────────
+# ── 每次启动都跑 init_db 补齐缺失的表（幂等 · IF NOT EXISTS）───
+# 说明：init_db 用 CREATE TABLE IF NOT EXISTS，对已有表无副作用。
+# 这样 schema 升级后老用户的 db 也能自动补新表（例如 jobs_pool 等核心业务表）。
 db_path = settings.db_full_path
-if not db_path.exists():
+db_path.parent.mkdir(parents=True, exist_ok=True)
+try:
     from scripts.init_db import init_database
     init_database(db_path)
+except Exception as _init_err:
+    # 即使 init 失败（比如表已存在 + 不兼容变更）也让页面继续渲染，报错给用户看
+    st.warning(f"数据库初始化遇到警告：{type(_init_err).__name__}: {_init_err}")
 
 # ── DEMO_MODE 全局提示条 ────────────────────────────────
 if settings.demo_mode:
