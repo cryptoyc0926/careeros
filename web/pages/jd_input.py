@@ -102,7 +102,98 @@ def extract_text(uploaded_file) -> str:
 # ═══════════════════════════════════════════════════════════════
 page_header("添加 JD", subtitle="加一个新岗位到你的视野里")
 
-tab_url, tab_smart_paste, tab_paste, tab_upload = st.tabs(["链接抓取", "智能粘贴", "手动粘贴", "上传文件"])
+tab_search, tab_url, tab_smart_paste, tab_paste, tab_upload = st.tabs([
+    "🔍 关键词搜索（推荐）", "链接抓取", "智能粘贴", "手动粘贴", "上传文件",
+])
+
+# ── 关键词搜索 → 自动入库 ─────────────────────────────────
+with tab_search:
+    st.markdown(
+        "输入关键词，AI 会全网搜索最新岗位，结构化后**批量入库到「岗位池」**。"
+        "（依赖 Claude 的 web_search 能力，仅 Anthropic 官方 Provider 支持实时搜索；"
+        "其他 provider 会 fallback 到模型训练数据推测）"
+    )
+
+    from config import settings as _settings_search
+
+    _profile = _settings_search.user_profile or {}
+    _career = _profile.get("career", {}) or {}
+    _default_keywords = ", ".join(_career.get("jd_keywords", []) or _career.get("target_roles", []))
+
+    sc1, sc2 = st.columns([2, 1])
+    with sc1:
+        search_kw_str = st.text_input(
+            "搜索关键词（逗号分隔）",
+            value=_default_keywords,
+            placeholder="例：AI 增长运营, 海外增长, 26 届校招",
+            help="至少 1 个关键词；多个关键词用逗号分隔。AI 会自动组合搜索。",
+            key="search_kw_input",
+        )
+    with sc2:
+        search_max = st.number_input("最多返回", min_value=5, max_value=30, value=15, step=5, key="search_max")
+
+    with st.expander("高级：按 P0 公司 / 排除公司精调搜索", expanded=False):
+        _p0_default = "\n".join(_career.get("target_companies_p0", []))
+        _ex_default = "\n".join(_career.get("excluded_companies", []))
+        adv_p0 = st.text_area("P0 公司白名单（每行一个）", value=_p0_default, height=80, key="search_p0")
+        adv_ex = st.text_area("排除公司（每行一个）", value=_ex_default, height=80, key="search_excluded")
+
+    if st.button("🔍 开始搜索", type="primary", key="do_keyword_search",
+                 disabled=not _settings_search.has_anthropic_key):
+        kws = [k.strip() for k in search_kw_str.split(",") if k.strip()]
+        if not kws:
+            alert_danger("请至少输入一个关键词。")
+        else:
+            try:
+                from services.job_search import search_and_extract
+                with st.spinner(f"AI 搜索中（约 30-60 秒 · 关键词: {', '.join(kws)}）..."):
+                    results = search_and_extract(
+                        keywords=kws,
+                        target_roles=_career.get("target_roles", []),
+                        target_companies_p0=[c.strip() for c in adv_p0.splitlines() if c.strip()],
+                        excluded_companies=[c.strip() for c in adv_ex.splitlines() if c.strip()],
+                        max_results=int(search_max),
+                    )
+                st.session_state["search_results"] = results
+                alert_success(f"✓ 找到 {len(results)} 个匹配岗位。下方预览后可批量入库。")
+            except Exception as e:
+                alert_danger(f"搜索失败：{type(e).__name__}: {e}")
+
+    if not _settings_search.has_anthropic_key:
+        alert_warning("需要先在「系统设置」填 API Key。")
+
+    # 搜索结果预览
+    _results = st.session_state.get("search_results", [])
+    if _results:
+        st.markdown(f"### 搜索结果预览（{len(_results)} 条）")
+        import pandas as _pd
+        _df_preview = _pd.DataFrame(_results)[
+            ["company", "position", "city", "priority", "match_score", "link_type", "notes", "link"]
+        ]
+        _df_preview.columns = ["公司", "岗位", "城市", "优先级", "匹配分", "链接类型", "备注", "URL"]
+        st.dataframe(_df_preview, use_container_width=True, hide_index=True)
+
+        ins_col, clr_col = st.columns([2, 1])
+        with ins_col:
+            if st.button(f"📥 把这 {len(_results)} 条入库到岗位池", type="primary", key="bulk_insert_jobs"):
+                try:
+                    from services.job_search import insert_jobs_to_pool
+                    stats = insert_jobs_to_pool(_settings_search.db_full_path, _results)
+                    alert_success(
+                        f"✓ 入库完成：新增 {stats['inserted']} · 跳过重复 {stats['skipped']}"
+                        + (f" · 错误 {len(stats['errors'])}" if stats['errors'] else "")
+                    )
+                    if stats['errors']:
+                        with st.expander("查看错误详情"):
+                            for e in stats['errors']:
+                                st.text(e)
+                    st.session_state["search_results"] = []
+                except Exception as e:
+                    alert_danger(f"入库失败：{type(e).__name__}: {e}")
+        with clr_col:
+            if st.button("清除搜索结果", key="clear_search_results"):
+                st.session_state["search_results"] = []
+                st.rerun()
 
 # ── 链接抓取 ────────────────────────────────────────────────
 with tab_url:
