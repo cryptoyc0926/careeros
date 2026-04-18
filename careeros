@@ -1,0 +1,84 @@
+#!/bin/bash
+# CareerOS 快捷启动器
+# 用法:
+#   careeros start   — 后台启动（带自动重启）
+#   careeros stop    — 停止
+#   careeros status  — 查看状态
+#   careeros restart — 重启
+#   careeros log     — 查看日志
+
+DIR="$(cd "$(dirname "$0")" && pwd)"
+WEB_DIR="$DIR/web"
+PORT=8501
+PID_FILE="$DIR/logs/.careeros.pid"
+LOG_FILE="$DIR/logs/streamlit.log"
+mkdir -p "$DIR/logs"
+
+_is_running() {
+    if [ -f "$PID_FILE" ]; then
+        pid=$(cat "$PID_FILE")
+        if kill -0 "$pid" 2>/dev/null; then
+            return 0
+        fi
+        rm -f "$PID_FILE"
+    fi
+    # 也检查端口
+    lsof -ti :$PORT >/dev/null 2>&1
+}
+
+_start() {
+    if _is_running; then
+        echo "✅ CareerOS 已在运行 (http://localhost:$PORT)"
+        return 0
+    fi
+    echo "🚀 启动 CareerOS..."
+    cd "$WEB_DIR" || exit 1
+    nohup bash -c '
+        while true; do
+            streamlit run app.py --server.port '"$PORT"' --server.headless true --browser.gatherUsageStats false 2>&1
+            echo "[$(date)] Streamlit 退出，3秒后重启..."
+            sleep 3
+        done
+    ' >> "$LOG_FILE" 2>&1 &
+    echo $! > "$PID_FILE"
+    sleep 3
+    if curl -s -o /dev/null http://localhost:$PORT; then
+        echo "✅ CareerOS 已启动: http://localhost:$PORT"
+    else
+        echo "⚠️ 启动中，请稍等几秒后访问 http://localhost:$PORT"
+    fi
+}
+
+_stop() {
+    # 停止守护进程
+    if [ -f "$PID_FILE" ]; then
+        pid=$(cat "$PID_FILE")
+        kill "$pid" 2>/dev/null
+        rm -f "$PID_FILE"
+    fi
+    # 停止端口上的进程
+    pids=$(lsof -ti :$PORT 2>/dev/null)
+    if [ -n "$pids" ]; then
+        echo "$pids" | xargs kill 2>/dev/null
+    fi
+    echo "🛑 CareerOS 已停止"
+}
+
+_status() {
+    if _is_running; then
+        echo "✅ CareerOS 运行中: http://localhost:$PORT"
+        pid=$(lsof -ti :$PORT 2>/dev/null | head -1)
+        [ -n "$pid" ] && echo "   PID: $pid"
+    else
+        echo "🔴 CareerOS 未运行"
+    fi
+}
+
+case "${1:-start}" in
+    start)   _start ;;
+    stop)    _stop ;;
+    restart) _stop; sleep 1; _start ;;
+    status)  _status ;;
+    log)     tail -50 "$LOG_FILE" ;;
+    *)       echo "用法: careeros {start|stop|restart|status|log}" ;;
+esac

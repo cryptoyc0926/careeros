@@ -1,0 +1,102 @@
+# CareerOS — 目标公司池示例（通用模板）
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# 首次使用：cp data/target_companies.example.yaml data/target_companies.yaml
+# 然后按自己的求职方向修改。工具只读取 data/target_companies.yaml。
+#
+# 字段说明：
+#   name     公司名（DB 去重用）
+#   scene    核心业务/赛道
+#   city     主要办公城市
+#   size     员工规模
+#   funding  最近融资轮次
+#   priority P0 优先主攻 / P1 积极投递 / P2 机会主义
+#   signals  为什么值得投（你的理由）
+#   referral 内推码（可选，放这里便于在 UI 里提醒你）
+#   contact  内推人/HR 邮箱（可选）
+
+# ── 排除清单：这些公司在入库时自动跳过（基于你的判断） ──
+excluded:
+  # 示例：
+  # - 某某公司
+  # 按自己的偏好填（可为空，代表不过滤任何公司）
+
+# ───────────────────────────────────────────────────
+# P0 — 主攻（按你的目标岗位方向 + 公司偏好定义）
+# 以下示例以"AI 大模型应用方向应届生"为样板，请替换为自己的
+# ───────────────────────────────────────────────────
+P0_大模型:
+  - {name: MiniMax,       scene: 通用大模型+海外C端,   city: 上海, size: 500-1000, funding: B轮,   priority: P0, signals: "海外 Talkie DAU 千万级"}
+  - {name: DeepSeek,      scene: 通用大模型,           city: 杭州, size: 200-500,  funding: 未融资, priority: P0, signals: "杭州本地，技术驱动文化"}
+  - {name: 月之暗面,       scene: Kimi 大模型,          city: 北京, size: 500-1000, funding: B+轮,  priority: P0, signals: "Kimi 出海增长方向"}
+  - {name: 智谱AI,         scene: ChatGLM 大模型,       city: 北京, size: 500-1000, funding: 战略轮, priority: P0, signals: "清华系，技术+商业化并重"}
+  - {name: 阶跃星辰,       scene: 多模态大模型,          city: 上海, size: 200-500,  funding: B轮,   priority: P0, signals: "多模态方向增长迅猛"}
+  - {name: 百川智能,       scene: 大模型+医疗,           city: 北京, size: 200-500,  funding: A+轮,  priority: P0, signals: "王小川团队"}
+  - {name: 零一万物,       scene: Yi 大模型,            city: 北京, size: 200-500,  funding: A轮,   priority: P0, signals: "李开复团队；出海方向多"}
+  - {name: 商汤科技,       scene: 视觉+大模型,           city: 上海, size: 5000+,    funding: 已上市, priority: P0, signals: "规模较大，增长运营 HC 多"}
+
+# ───────────────────────────────────────────────────
+# P1 — 积极投递（AI 应用层 / C 端工具）
+# ───────────────────────────────────────────────────
+P1_AI应用层:
+  - {name: 秘塔科技,         scene: 秘塔 AI 搜索,          city: 上海, size: 50-100,  funding: A轮,   priority: P1, signals: "AI 搜索赛道头部"}
+  - {name: 蝴蝶效应,         scene: Manus AI Agent,       city: 北京, size: 30-80,   funding: A轮,   priority: P1, signals: "2025 爆款 Agent"}
+  - {name: Butterfly Effect, scene: Monica.im 浏览器助手, city: 北京, size: 50-100,  funding: A轮,   priority: P1, signals: "海外用户为主"}
+  - {name: 实在智能,         scene: 实在 Agent (RPA+LLM), city: 杭州, size: 200-500, funding: C轮,   priority: P1, signals: "Agent 落地领先"}
+  - {name: 万兴科技,         scene: 万兴喵影/PDF AI,       city: 长沙, size: 1000+,   funding: 已上市, priority: P1, signals: "AI 产品/运营 HC 多"}
+  - {name: 昆仑万维,         scene: 天工大模型+AI 应用,    city: 北京, size: 1000+,   funding: 已上市, priority: P1, signals: "AI 出海业务增长岗多"}
+  - {name: 面壁智能,         scene: MiniCPM 端侧大模型,   city: 北京, size: 50-100,  funding: B轮,   priority: P1, signals: "端侧+Agent 方向"}
+
+# ───────────────────────────────────────────────────
+# P1 — AIGC 内容生成
+# ───────────────────────────────────────────────────
+P1_AIGC生成:
+  - {name: 生数科技,    scene: Vidu AI 视频大模型, city: 北京, size: 100-200, funding: A+轮, priority: P1, signals: "全球第二，出海增长"}
+  - {name: 爱诗科技,    scene: PixVerse AI 视频,   city: 北京, size: 50-100,  funding: A-A4轮, priority: P1, signals: "海外千万级用户"}
+  - {name: LiblibAI,    scene: AI 图像创作社区,     city: 上海, size: 50-100,  funding: A轮,  priority: P1, signals: "SD 生态社区运营"}
+  - {name: HeyGen,      scene: AI 视频主播,         city: 深圳/海外, size: 50-100, funding: A轮, priority: P1, signals: "出海头部"}
+
+# ───────────────────────────────────────────────────
+# P1 — AI Infra / Agent 框架 / 向量库
+# ───────────────────────────────────────────────────
+P1_AI_infra:
+  - {name: Zilliz,        scene: Milvus 向量数据库,    city: 上海,    size: 100-200, funding: B+轮, priority: P1, signals: "全球领导象限"}
+  - {name: Dify,          scene: LLMOps 开源 Agent,   city: 苏州/远程, size: 30-80,  funding: A轮,  priority: P1, signals: "GitHub 50k+ star"}
+  - {name: Infiniflow,    scene: RagFlow 企业 RAG,    city: 上海,    size: 30-50,   funding: 天使轮, priority: P1, signals: "开源领先"}
+
+# ───────────────────────────────────────────────────
+# P2 — 机会主义（具身智能 / 垂直行业）
+# ───────────────────────────────────────────────────
+P2_具身智能:
+  - {name: 智平方,   scene: 具身智能大脑,  city: 深圳, size: 200-500, funding: B轮,  priority: P2, signals: "百亿估值具身独角兽"}
+  - {name: 银河通用, scene: 通用机器人,    city: 北京, size: 100-300, funding: B轮,  priority: P2, signals: "HC 开放充足"}
+  - {name: 宇树科技, scene: 人形机器人,    city: 杭州, size: 200-500, funding: C轮,  priority: P2, signals: "杭州本地"}
+
+# ───────────────────────────────────────────────────
+# 扫描关键词（job_crawler 用，按自己目标岗位改）
+# ───────────────────────────────────────────────────
+search_terms:
+  operations:   ["增长运营", "AI 增长", "用户增长", "海外增长", "内容运营", "社区运营", "数据运营"]
+  product:      ["产品运营", "AI 产品", "需求分析师"]
+  exclude_roles: ["销售", "电销", "BD", "商务拓展", "客服", "代运营", "算法工程师", "后端工程师", "前端工程师"]
+  role_level:   ["校招", "2026届", "应届", "实习", "Junior"]
+
+# ───────────────────────────────────────────────────
+# 评分权重（match_v2 用，按自己优先级调）
+# ───────────────────────────────────────────────────
+scoring:
+  skill_match:     0.30
+  company_size:    0.20
+  track_relevance: 0.25
+  city_match:      0.15
+  freshness:       0.10
+  size_bonus:
+    "30-100":   20
+    "100-500":  18
+    "500-1000": 10
+    "1000+":    5
+  city_bonus:
+    杭州: 15
+    上海: 12
+    北京: 8
+    深圳: 8
+    远程: 13

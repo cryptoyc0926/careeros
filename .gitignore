@@ -1,0 +1,92 @@
+# ═══════════════════════════════════════════════════════════
+# CareerOS .gitignore（项目根）
+# 保护用户私人数据 + 运行时产物不进公开仓库
+# ═══════════════════════════════════════════════════════════
+
+# ── 数据库（用户私人数据）────────────────────────────────
+data/*.db
+data/*.db-journal
+data/*.db.bak*
+data/*.db-wal
+data/*.db-shm
+
+# ── 用户私人配置 / 简历内容（都只作为 .example.* 进仓库）────
+data/user_profile.yaml
+data/target_companies.yaml
+data/resume_master_sample.json
+data/master_resume.yaml
+web/data/master_resume*.yaml*
+# 允许 example 文件进仓库
+!data/*.example.*
+!data/*.example.yaml
+!data/*.example.json
+
+# ── LinkedIn 个人资料 ────────────────────────────────────
+linkedin/
+data/linkedin_*.yaml
+data/linkedin_*.md
+data/linkedin_*.png
+data/linkedin_banner.*
+
+# ── 生成产物 ──────────────────────────────────────────────
+output/
+reports/
+*.pdf
+*.docx
+web/templates/resume_yangchao_*.html
+web/templates/yangchao_photo.*
+
+# ── 环境变量 / Secrets ───────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.env
+web/.env
+.streamlit/secrets.toml
+web/.streamlit/secrets.toml
+
+# ── Claude Code 作者私有（不对外发布）──────────────────
+CLAUDE.md
+.claude/
+.claude-preview/
+各Agent个性化更新清单.md
+DESIGN.md
+
+# ── 作者私有 prompts / scripts（含个人信息）─────────────
+prompts/v4_framework.md
+scripts/gen_linkedin_banner.py
+scripts/migrate.py
+
+# ── Python ────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# ── IDE / OS ──────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── 测试 / 覆盖率 ────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ── Playwright 浏览器缓存 ───────────────────────────────
+.playwright/
+playwright-report/
+
+# ── Streamlit 缓存 ───────────────────────────────────────
+.streamlit/cache/

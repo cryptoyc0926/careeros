@@ -1,0 +1,59 @@
+# 跟 .gitignore 对齐，但 Docker 里更严格（只复制必要的）
+
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# 私人数据（不能进镜像）
+data/*.db
+data/*.db-journal
+data/*.db.bak*
+data/user_profile.yaml
+data/target_companies.yaml
+data/resume_master_sample.json
+data/master_resume.yaml
+data/linkedin_*
+linkedin/
+
+# 生成产物
+output/
+reports/
+*.pdf
+*.docx
+
+# 环境
+.env
+.env.local
+*.env
+.streamlit/secrets.toml
+
+# Claude Code 作者私有
+CLAUDE.md
+.claude/
+.claude-preview/
+各Agent个性化更新清单.md
+DESIGN.md
+prompts/v4_framework.md
+scripts/gen_linkedin_banner.py
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Docs（Dockerfile 不需要）
+docs/screenshots/
+*.md
+!README.md

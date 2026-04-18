@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+@page {
+    size: A4;
+    margin: 1.0cm 1.5cm 0.8cm 1.5cm;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: "Microsoft YaHei", "PingFang SC", "SimHei", "Heiti SC",
+                 "Source Han Sans SC", "Noto Sans CJK SC", sans-serif;
+    font-size: 9.5pt;
+    line-height: 1.38;
+    color: #000;
+}
+
+b, strong { font-weight: 700; }
+
+.header-table { width: 100%; border-collapse: collapse; margin-bottom: 8pt; }
+.header-table td { padding: 0; border: none; vertical-align: middle; }
+.header-left { text-align: center; padding-right: 12pt; }
+.header-right { width: 72pt; text-align: right; vertical-align: top; }
+
+.name {
+    font-family: "SimHei", "Heiti SC", "Microsoft YaHei", sans-serif;
+    font-size: 34pt;
+    font-weight: 700;
+    letter-spacing: 12pt;
+    color: #000;
+    margin-top: 0;
+    margin-bottom: 6pt;
+    line-height: 1.05;
+}
+
+.contact-line { font-size: 10pt; color: #000; margin-bottom: 2pt; }
+.contact-line a { color: #0563c1; text-decoration: underline; }
+.intent-line { font-size: 10pt; color: #000; }
+
+.photo { width: 68pt; height: auto; }
+
+.section-title {
+    background: #e7e6e6;
+    padding: 2pt 6pt;
+    font-family: "SimHei", "Heiti SC", "Microsoft YaHei", sans-serif;
+    font-size: 13pt;
+    font-weight: 700;
+    color: #000;
+    margin-top: 5pt;
+    margin-bottom: 2pt;
+    display: block;
+}
+
+.profile-text {
+    font-size: 9.5pt;
+    line-height: 1.45;
+    color: #000;
+    margin: 2pt 0;
+}
+
+.exp-head { width: 100%; border-collapse: collapse; margin-top: 2pt; margin-bottom: 1pt; }
+.exp-head td {
+    padding: 0; border: none; vertical-align: baseline;
+    font-size: 10pt; font-weight: 700; color: #000;
+}
+.exp-head .col-company { text-align: left; width: 35%; }
+.exp-head .col-role { text-align: center; width: 35%; }
+.exp-head .col-date { text-align: right; width: 30%; }
+
+.bl { margin-top: 1pt; margin-bottom: 2pt; }
+.bi {
+    font-size: 9.5pt; line-height: 1.42;
+    padding-left: 14pt; text-indent: -10pt;
+    margin-bottom: 1pt;
+}
+.bi::before { content: "\2022\00a0"; font-size: 9pt; }
+
+.edu-bullet {
+    font-size: 9.5pt; line-height: 1.42;
+    padding-left: 14pt; text-indent: -10pt;
+    margin-bottom: 1pt;
+}
+.edu-bullet::before { content: "\2022\00a0"; font-size: 9pt; }
+
+.skill-label { font-weight: 700; }
+.no-break { page-break-inside: avoid; }
+</style>
+</head>
+<body>
+
+<table class="header-table">
+    <tr>
+        <td class="header-left">
+            <div class="name">{{ basics.name }}</div>
+            <div class="contact-line">{{ basics.phone }} &nbsp;|&nbsp; <a href="mailto:{{ basics.email }}">{{ basics.email }}</a></div>
+            <div class="intent-line">求职意向：{{ basics.target_role }} &nbsp;|&nbsp; 期望城市：{{ basics.city }} &nbsp;|&nbsp; 到岗时间：{{ basics.availability }}</div>
+        </td>
+        <td class="header-right">
+            {% if basics.photo %}<img class="photo" src="{{ basics.photo }}" alt="photo">{% endif %}
+        </td>
+    </tr>
+</table>
+
+<div class="section-title">个人总结</div>
+<div class="profile-text">{{ profile | safe }}</div>
+
+<div class="section-title">项目经历</div>
+{% for p in projects %}
+<div class="no-break">
+    <table class="exp-head">
+        <tr>
+            <td class="col-company">{{ p.company }}</td>
+            <td class="col-role">{{ p.role }}</td>
+            <td class="col-date">{{ p.date }}</td>
+        </tr>
+    </table>
+    <div class="bl">
+        {% for b in p.bullets %}<div class="bi">{{ b | safe }}</div>{% endfor %}
+    </div>
+</div>
+{% endfor %}
+
+<div class="section-title">实习经历</div>
+{% for i in internships %}
+<div class="no-break">
+    <table class="exp-head">
+        <tr>
+            <td class="col-company">{{ i.company }}</td>
+            <td class="col-role">{{ i.role }}</td>
+            <td class="col-date">{{ i.date }}</td>
+        </tr>
+    </table>
+    <div class="bl">
+        {% for b in i.bullets %}<div class="bi">{{ b | safe }}</div>{% endfor %}
+    </div>
+</div>
+{% endfor %}
+
+<div class="section-title">技能证书</div>
+<div class="bl">
+    {% for s in skills %}<div class="edu-bullet"><span class="skill-label">{{ s.label }}：</span>{{ s.text | safe }}</div>{% endfor %}
+</div>
+
+<div class="section-title">教育背景</div>
+{% for e in education %}
+<div class="no-break">
+    <table class="exp-head">
+        <tr>
+            <td class="col-company">{{ e.school }}</td>
+            <td class="col-role">{{ e.major }}</td>
+            <td class="col-date">{{ e.date }}</td>
+        </tr>
+    </table>
+    <div class="bl">
+        {% for b in e.bullets %}<div class="edu-bullet">{{ b | safe }}</div>{% endfor %}
+    </div>
+</div>
+{% endfor %}
+
+</body>
+</html>

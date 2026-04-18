@@ -1,0 +1,243 @@
+"""仪表盘 — 求职全局总览与行动漏斗。"""
+
+import streamlit as st
+import pandas as pd
+from models.database import query
+from components.ui import (
+    page_header,
+    section_title,
+    divider,
+    badge,
+    soft_stat_card,
+    funnel_stage_card,
+    diagnostic_alert,
+)
+
+page_header("🏠 求职仪表盘", subtitle="实时求职漏斗 · 每次打开看转化瓶颈")
+
+# ══════════════════════════════════════════════════════════════
+# 核心指标 — 从 jobs_pool (真实数据) + job_descriptions 双源汇总
+# ══════════════════════════════════════════════════════════════
+
+try:
+    # jobs_pool 统计
+    jp_total = query("SELECT COUNT(*) AS c FROM jobs_pool WHERE COALESCE(status,'NEW') != '已排除'")[0]["c"]
+    jp_p0 = query("SELECT COUNT(*) AS c FROM jobs_pool WHERE 等级='P0' AND COALESCE(status,'NEW') != '已排除'")[0]["c"]
+    jp_applied = query("SELECT COUNT(*) AS c FROM jobs_pool WHERE status='已投递'")[0]["c"]
+    jp_new = query("SELECT COUNT(*) AS c FROM jobs_pool WHERE COALESCE(status,'NEW')='NEW'")[0]["c"]
+    jp_avg = query("SELECT ROUND(AVG(匹配分),1) AS c FROM jobs_pool WHERE COALESCE(status,'NEW') != '已排除'")[0]["c"] or 0
+except Exception:
+    jp_total = jp_p0 = jp_applied = jp_new = 0
+    jp_avg = 0
+
+try:
+    # job_descriptions 统计（面试/offer 阶段）
+    jd_interview = query("SELECT COUNT(*) AS c FROM job_descriptions WHERE status='interview'")[0]["c"]
+    jd_offer = query("SELECT COUNT(*) AS c FROM job_descriptions WHERE status='offer'")[0]["c"]
+    jd_rejected = query("SELECT COUNT(*) AS c FROM job_descriptions WHERE status='rejected'")[0]["c"]
+except Exception:
+    jd_interview = jd_offer = jd_rejected = 0
+
+# ── 第一行：核心数字 ─────────────────────────────────────────
+
+_stats = [
+    (jp_total, "岗位池"),
+    (jp_p0, "P0 岗位"),
+    (jp_new, "待行动"),
+    (jp_applied, "已投递"),
+    (jd_interview, "面试中"),
+    (jd_offer, "Offer"),
+]
+_cols = st.columns(6, gap="small")
+for _col, (_val, _lbl) in zip(_cols, _stats):
+    with _col:
+        soft_stat_card(_val, _lbl)
+
+# ══════════════════════════════════════════════════════════════
+# 求职漏斗 — 从发现到拿Offer的转化可视化
+# ══════════════════════════════════════════════════════════════
+# 漏斗逻辑：
+#   发现岗位(全部) → P0筛选 → 已投递 → 面试 → Offer
+#   每个阶段显示数量和转化率，帮助你识别瓶颈：
+#   - P0/总数 低 → 岗位质量不够，需要优化搜索策略
+#   - 已投递/P0 低 → 行动力不足，今天就去投
+#   - 面试/已投递 低 → 简历需要优化
+#   - Offer/面试 低 → 面试准备不足
+
+divider()
+section_title("求职转化漏斗", "📊")
+st.caption("每个阶段的转化率帮你定位瓶颈 — 哪个环节在拖后腿？")
+
+funnel_stages = [
+    ("发现岗位", jp_total),
+    ("P0 筛选", jp_p0),
+    ("已投递", jp_applied),
+    ("面试中", jd_interview),
+    ("拿到 Offer", jd_offer),
+]
+
+cols = st.columns(len(funnel_stages))
+for i, (label, count) in enumerate(funnel_stages):
+    with cols[i]:
+        if i > 0:
+            prev_count = funnel_stages[i - 1][1]
+            rate_hint = f"↓ {count / prev_count * 100:.0f}%" if prev_count > 0 else "↓ —"
+        else:
+            rate_hint = "起点"
+        funnel_stage_card(label, count, rate_hint=rate_hint)
+
+if jp_total > 0 and jp_applied == 0:
+    diagnostic_alert("danger", f"瓶颈：零投递 — 岗位池有 {jp_total} 个岗位但还没开始投递。先投 P0 里匹配分最高的 3 个。")
+elif jp_p0 > 0 and jp_applied > 0 and jp_applied / jp_p0 < 0.3:
+    diagnostic_alert("info", f"P0 投递率 {jp_applied}/{jp_p0} = {jp_applied/jp_p0*100:.0f}%，还有 {jp_p0 - jp_applied} 个 P0 待投递")
+elif jp_applied > 0 and jd_interview == 0:
+    diagnostic_alert("info", f"已投递 {jp_applied} 个，还没有面试邀约 — 检查简历匹配度，或跟进 HR")
+elif jd_interview > 0 and jd_offer == 0:
+    diagnostic_alert("success", f"{jd_interview} 个面试进行中，做好面试准备")
+elif jd_offer > 0:
+    diagnostic_alert("success", f"已拿到 {jd_offer} 个 Offer")
+
+# ══════════════════════════════════════════════════════════════
+# 岗位等级分布 + 今日快报
+# ══════════════════════════════════════════════════════════════
+
+divider()
+
+left, right = st.columns([1, 1])
+
+with left:
+    section_title("岗位等级分布", "📈")
+    try:
+        dist = query("SELECT 等级, COUNT(*) AS 数量 FROM jobs_pool WHERE COALESCE(status,'NEW') != '已排除' GROUP BY 等级 ORDER BY 等级")
+        if dist:
+            df_dist = pd.DataFrame(dist)
+            st.bar_chart(df_dist.set_index("等级")["数量"], color="#0071e3")
+        else:
+            st.caption("暂无数据")
+    except Exception:
+        st.caption("暂无数据")
+
+with right:
+    section_title("P0 待行动清单", "🎯")
+    try:
+        p0_new = query(
+            "SELECT 公司, 岗位名称, 匹配分, 今日行动 FROM jobs_pool "
+            "WHERE 等级='P0' AND COALESCE(status,'NEW')='NEW' "
+            "ORDER BY 匹配分 DESC LIMIT 8"
+        )
+        if p0_new:
+            for r in p0_new:
+                score = int(r["匹配分"]) if r["匹配分"] else 0
+                action = r["今日行动"] or "待定"
+                short_action = action[:30] + "…" if len(action) > 30 else action
+                st.markdown(
+                    f'<div style="background:#ffffff;border:1px solid rgba(29,29,31,0.06);'
+                    f'padding:8px 12px;border-radius:6px;margin:4px 0">'
+                    f'<div style="font-size:13px;font-weight:600;color:#1d1d1f">'
+                    f'{r["公司"]} · {r["岗位名称"]} '
+                    f'<span style="font-family:SF Mono,monospace;color:#0071e3;font-size:12px">{score}分</span></div>'
+                    f'<div style="font-size:12px;color:#6e6e73;margin-top:3px">→ {short_action}</div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+        else:
+            st.caption("所有 P0 岗位都已处理")
+    except Exception:
+        st.caption("暂无数据")
+
+# ══════════════════════════════════════════════════════════════
+# 匹配分分布
+# ══════════════════════════════════════════════════════════════
+
+divider()
+section_title("匹配分分布", "📊")
+
+try:
+    scores = query("SELECT 匹配分 FROM jobs_pool WHERE COALESCE(status,'NEW') != '已排除' AND 匹配分 IS NOT NULL")
+    if scores:
+        df_scores = pd.DataFrame(scores)
+        # 分桶统计
+        bins = {"90+": 0, "80-89": 0, "70-79": 0, "60-69": 0, "<60": 0}
+        for s in df_scores["匹配分"]:
+            if s >= 90: bins["90+"] += 1
+            elif s >= 80: bins["80-89"] += 1
+            elif s >= 70: bins["70-79"] += 1
+            elif s >= 60: bins["60-69"] += 1
+            else: bins["<60"] += 1
+        df_bins = pd.DataFrame({"分数段": list(bins.keys()), "岗位数": list(bins.values())})
+        st.bar_chart(df_bins.set_index("分数段")["岗位数"], color="#0071e3")
+    else:
+        st.caption("暂无评分数据")
+except Exception:
+    st.caption("暂无评分数据")
+
+# ══════════════════════════════════════════════════════════════
+# 投递模式分析（Phase 3.2）
+# ══════════════════════════════════════════════════════════════
+
+divider()
+section_title("投递模式分析", "📈")
+
+try:
+    # 各渠道统计
+    channel_stats = query(
+        """SELECT apply_channel, COUNT(*) AS total,
+                  SUM(CASE WHEN status='已投递' THEN 1 ELSE 0 END) AS applied
+           FROM jobs_pool
+           WHERE apply_channel IS NOT NULL
+           GROUP BY apply_channel"""
+    )
+    if channel_stats:
+        ch_left, ch_right = st.columns(2)
+        with ch_left:
+            section_title("各渠道投递数")
+            ch_labels = {"boss": "Boss直聘", "email": "邮件", "referral": "内推",
+                         "portal": "校招门户", "maimai": "脉脉", "wechat": "企业微信"}
+            df_ch = pd.DataFrame(channel_stats)
+            df_ch["渠道"] = df_ch["apply_channel"].map(lambda x: ch_labels.get(x, x))
+            st.bar_chart(df_ch.set_index("渠道")["total"], color="#0071e3")
+
+        with ch_right:
+            section_title("跟进状态")
+            followup_stats = query(
+                """SELECT
+                      SUM(CASE WHEN followup_count = 0 THEN 1 ELSE 0 END) AS 未跟进,
+                      SUM(CASE WHEN followup_count = 1 THEN 1 ELSE 0 END) AS 跟进1次,
+                      SUM(CASE WHEN followup_count >= 2 THEN 1 ELSE 0 END) AS 跟进2次以上
+                   FROM jobs_pool WHERE status='已投递'"""
+            )
+            if followup_stats:
+                fs = followup_stats[0]
+                fc1, fc2, fc3 = st.columns(3)
+                with fc1:
+                    soft_stat_card(fs.get("未跟进", 0), "未跟进")
+                with fc2:
+                    soft_stat_card(fs.get("跟进1次", 0), "跟进1次")
+                with fc3:
+                    soft_stat_card(fs.get("跟进2次以上", 0), "跟进2次+")
+
+    # 各等级响应率
+    priority_stats = query(
+        """SELECT 等级,
+                  COUNT(*) AS total,
+                  SUM(CASE WHEN status='已投递' THEN 1 ELSE 0 END) AS applied
+           FROM jobs_pool
+           WHERE COALESCE(status,'NEW') != '已排除'
+           GROUP BY 等级 ORDER BY 等级"""
+    )
+    if priority_stats:
+        section_title("各等级投递率")
+        for ps in priority_stats:
+            total = ps["total"]
+            applied = ps["applied"]
+            rate = f"{applied/total*100:.0f}%" if total > 0 else "0%"
+            st.caption(f"{ps['等级']}: {applied}/{total} = {rate}")
+    else:
+        st.caption("暂无投递数据")
+except Exception:
+    st.caption("暂无投递分析数据")
+
+# ── 底部信息 ─────────────────────────────────────────────────
+divider()
+jd_total = query('SELECT COUNT(*) AS c FROM job_descriptions')[0]['c']
+st.caption(f"数据来源：jobs_pool {jp_total} 条 · job_descriptions {jd_total} 条 · 今日 {__import__('datetime').date.today()}")

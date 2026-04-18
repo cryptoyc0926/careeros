@@ -1,0 +1,50 @@
+# CareerOS 用户画像示例
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# 首次使用：
+#   1. cp data/user_profile.example.yaml data/user_profile.yaml
+#   2. 按自己的情况修改下面的字段
+#   3. 或者启动 streamlit 后在「系统设置 → 个人画像」里填写，会自动生成 user_profile.yaml
+#
+# 所有页面（邮件模板、简历定制、面试准备）都会读这份画像。
+
+user:
+  name: "你的中文姓名"
+  name_en: "Your English Name"        # 可选，用于海外简历
+  school: "学校名"
+  major: "专业名"
+  graduation_year: 2026               # 毕业年
+  degree: "本科"                      # 本科 / 硕士 / 博士
+  email: "you@example.com"
+  phone: "13800000000"
+  city: "杭州"                        # 目标城市
+
+career:
+  # 目标岗位方向（按权重降序，至少 1 个）
+  target_roles:
+    - "AI 增长运营"
+    - "产品运营"
+
+  # 核心 JD 关键词（用于匹配评分）
+  jd_keywords:
+    - "AI"
+    - "增长"
+    - "运营"
+
+  # P0 主攻公司（最优先投递）
+  target_companies_p0: []
+
+  # P1 积极投递
+  target_companies_p1: []
+
+  # 明确排除（不想投的公司，扫描时自动过滤）
+  excluded_companies: []
+
+  # 内推码（{公司名: 内推码字符串}）
+  referral_codes: {}
+  # 示例：
+  # referral_codes:
+  #   MiniMax: "XXXXXXX"
+  #   智谱AI: "YYYYYYY"
+
+  # 一句话核心亮点（会注入邮件/内推模板的 {highlights} 占位）
+  highlights: "（用 1-2 句概括你最核心的可迁移能力，例：数据科学背景 + 社区运营实战）"
