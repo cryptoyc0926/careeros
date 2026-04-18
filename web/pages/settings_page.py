@@ -2,6 +2,7 @@
 
 import streamlit as st
 import os
+import json
 from pathlib import Path
 from config import settings
 from components.ui import (
@@ -280,6 +281,81 @@ if settings.has_smtp:
 else:
     st.markdown(badge("未配置", "muted"), unsafe_allow_html=True)
     st.caption("配置后可直接从系统发送求职邮件。")
+
+# ══════════════════════════════════════════════════════════
+# 数据备份：导出所有数据到 JSON / 从 JSON 导入
+# 云端部署上这是唯一的数据持久化方式（Cloud FS 只读/重启丢数据）
+# ══════════════════════════════════════════════════════════
+divider()
+apple_section_heading(
+    "数据备份与恢复",
+    subtitle="把所有岗位/简历/投递记录导出成一个 JSON 文件保存到本地，下次打开再导入",
+)
+
+alert_info(
+    "**为什么需要这个？** 在 Streamlit Cloud / HF Space 上运行时，应用重启会丢失所有数据。"
+    "用完点「导出所有数据」下载 JSON 到你的本地文件夹（iCloud / OneDrive / Google Drive 同步盘都行），"
+    "下次打开应用时「从文件导入」选它就能恢复 —— **这就是你的本地持久化方案**。"
+)
+
+from services.data_sync import export_all_data, import_all_data
+from datetime import datetime
+
+bc1, bc2 = st.columns(2)
+
+with bc1:
+    st.markdown("**📤 导出数据**")
+    if settings.db_full_path.exists():
+        try:
+            payload = export_all_data(settings.db_full_path, settings.user_profile)
+            total_rows = sum(len(v) for v in payload.get("tables", {}).values())
+            _stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            st.download_button(
+                "📦 下载 careeros_backup_"+_stamp+".json",
+                data=json.dumps(payload, ensure_ascii=False, indent=2),
+                file_name=f"careeros_backup_{_stamp}.json",
+                mime="application/json",
+                use_container_width=True,
+                help=f"当前快照包含 {total_rows} 行数据，外加个人画像 user_profile",
+            )
+            st.caption(f"当前待备份：{total_rows} 行数据 · {len(payload.get('tables', {}))} 张表")
+        except Exception as e:
+            alert_danger(f"导出失败：{e}")
+    else:
+        st.caption("数据库还未初始化，暂无数据可导出。")
+
+with bc2:
+    st.markdown("**📥 从文件导入**")
+    uploaded = st.file_uploader(
+        "选择 careeros_backup_*.json 文件",
+        type=["json"],
+        help="从上次「导出数据」下载的文件",
+        key="backup_uploader",
+    )
+    import_mode = st.radio(
+        "导入方式",
+        options=["merge", "replace"],
+        format_func=lambda m: {"merge": "合并（保留现有数据 · 推荐）", "replace": "替换（清空后导入 · 危险）"}[m],
+        horizontal=False,
+        key="import_mode_radio",
+    )
+    if uploaded is not None:
+        if st.button("确认导入", type="primary", key="do_import"):
+            try:
+                payload = json.loads(uploaded.read().decode("utf-8"))
+                # 先导入 user_profile（如存在）
+                if payload.get("user_profile"):
+                    settings.save_user_profile(payload["user_profile"])
+                # 导入表数据
+                stats = import_all_data(settings.db_full_path, payload, mode=import_mode)
+                total = sum(stats.values())
+                alert_success(
+                    f"导入成功：共 {total} 行。"
+                    f" 明细：{', '.join(f'{k}={v}' for k, v in stats.items() if v > 0) or '无新增'}"
+                )
+                st.rerun()
+            except Exception as e:
+                alert_danger(f"导入失败：{type(e).__name__}: {e}")
 
 # ── 文件路径 ──────────────────────────────────────────────
 divider()
