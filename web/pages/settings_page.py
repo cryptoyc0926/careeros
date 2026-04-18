@@ -150,9 +150,20 @@ _PROVIDERS = {
     },
 }
 
-_current_provider = current_env.get("LLM_PROVIDER", "anthropic").lower()
+# 读取当前 provider（优先 session_state > .env）
+_current_provider = (
+    st.session_state.get("LLM_PROVIDER")
+    or current_env.get("LLM_PROVIDER", "anthropic")
+).lower()
 if _current_provider not in _PROVIDERS:
     _current_provider = "anthropic"
+
+# 云端 BYO-Key 提示
+if settings.demo_mode:
+    alert_info(
+        "**BYO-Key 模式**：你在下面填的 API Key 只存在当前浏览器会话，**关闭页面就清空**（零数据泄露风险）。"
+        "如需长期保存，建议本地部署：`git clone` 后在 `web/.env` 里填 Key。"
+    )
 
 with st.form("api_config"):
     provider_keys = list(_PROVIDERS.keys())
@@ -168,30 +179,44 @@ with st.form("api_config"):
 
     api_key = st.text_input(
         "API Key",
-        value=current_env.get("ANTHROPIC_API_KEY", ""),
+        value=st.session_state.get("ANTHROPIC_API_KEY") or current_env.get("ANTHROPIC_API_KEY", ""),
         type="password",
-        help="粘贴从上面链接申请到的 Key。所有 provider 都统一存到 ANTHROPIC_API_KEY 变量（SDK 要求）。",
+        help="粘贴从上面链接申请到的 Key。BYO-Key 模式下只存在当前浏览器会话。",
     )
     base_url = st.text_input(
         "API 端点（base_url）",
-        value=current_env.get("ANTHROPIC_BASE_URL", "") or _p["base_url"],
+        value=st.session_state.get("ANTHROPIC_BASE_URL") or current_env.get("ANTHROPIC_BASE_URL", "") or _p["base_url"],
         help="留空用 Anthropic 官方。其他 provider 会自动填对应端点。",
         placeholder=_p["base_url"] or "https://api.anthropic.com",
     )
     model = st.text_input(
         "模型名称",
-        value=current_env.get("CLAUDE_MODEL", "") or _p["model"],
+        value=st.session_state.get("CLAUDE_MODEL") or current_env.get("CLAUDE_MODEL", "") or _p["model"],
         help="每家 provider 的可用模型名不同，参考下面提示",
         placeholder=_p["model"],
     )
 
     if st.form_submit_button("保存 API 配置", type="primary"):
-        current_env["LLM_PROVIDER"] = provider
-        current_env["ANTHROPIC_API_KEY"] = api_key
-        current_env["ANTHROPIC_BASE_URL"] = base_url
-        current_env["CLAUDE_MODEL"] = model
-        _write_env(current_env)
-        alert_success(f"配置已保存（Provider: {_p['label']}）。请重启应用后生效。")
+        # BYO-Key / DEMO_MODE：只写 session_state（云端 FS 只读）
+        # 本地模式：同时写 session_state + .env（永久保存）
+        st.session_state["LLM_PROVIDER"]      = provider
+        st.session_state["ANTHROPIC_API_KEY"] = api_key
+        st.session_state["ANTHROPIC_BASE_URL"] = base_url
+        st.session_state["CLAUDE_MODEL"]      = model
+
+        _can_write_env = not settings.demo_mode
+        if _can_write_env:
+            try:
+                current_env["LLM_PROVIDER"]       = provider
+                current_env["ANTHROPIC_API_KEY"]  = api_key
+                current_env["ANTHROPIC_BASE_URL"] = base_url
+                current_env["CLAUDE_MODEL"]      = model
+                _write_env(current_env)
+                alert_success(f"配置已保存到当前会话 + .env（Provider: {_p['label']}）")
+            except Exception as e:
+                alert_success(f"配置已保存到当前会话（Provider: {_p['label']}）· .env 写入失败：{e}")
+        else:
+            alert_success(f"配置已保存到当前会话（Provider: {_p['label']}）· 关闭页面后清空")
 
 # 状态指示（用 badge 组件替代 emoji）
 if settings.has_anthropic_key:

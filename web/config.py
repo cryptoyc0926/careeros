@@ -32,21 +32,28 @@ _USER_PROFILE_EXAMPLE = (_ROOT.parent / "data" / "user_profile.example.yaml")
 class Settings:
     """Application settings loaded from environment / .env file."""
 
-    # ── LLM Provider（统一抽象）──────────────────────────────
-    # 目前所有模型都通过 Anthropic SDK 调用。支持的 provider：
-    #   - anthropic (官方)
-    #   - kimi (月之暗面 — 走 Anthropic 兼容端点)
-    #   - glm (智谱 — 走 Anthropic 兼容端点)
-    #   - deepseek (DeepSeek — 走 Anthropic 兼容端点)
-    #   - proxy (自定义代理)
+    # ── LLM Provider（统一抽象 · 优先 session_state > env）─────
+    # BYO-Key 模式：访客在设置页填的 Key 存在 st.session_state，
+    # 关闭浏览器就丢（作者不承担任何费用 / 用户之间不共享）。
+    # 本地模式：用户可以填 .env 永久保存。
+    @staticmethod
+    def _session_get(key: str, default: str = "") -> str:
+        """从 streamlit.session_state 读，不在 streamlit 上下文则返回 default。"""
+        try:
+            import streamlit as st
+            return str(st.session_state.get(key, "") or default)
+        except Exception:
+            return default
+
     @property
     def llm_provider(self) -> str:
-        return os.getenv("LLM_PROVIDER", "anthropic").lower()
+        return (self._session_get("LLM_PROVIDER")
+                or os.getenv("LLM_PROVIDER", "anthropic")).lower()
 
     @property
     def anthropic_api_key(self) -> str:
-        # 多 provider 场景下，API Key 统一走 ANTHROPIC_API_KEY 变量（SDK 要求）
-        return os.getenv("ANTHROPIC_API_KEY", "")
+        return (self._session_get("ANTHROPIC_API_KEY")
+                or os.getenv("ANTHROPIC_API_KEY", ""))
 
     @property
     def anthropic_base_url(self) -> str:
@@ -56,10 +63,10 @@ class Settings:
         - deepseek: https://api.deepseek.com/anthropic
         留空则使用 Anthropic 官方。
         """
-        explicit = os.getenv("ANTHROPIC_BASE_URL", "")
+        explicit = (self._session_get("ANTHROPIC_BASE_URL")
+                    or os.getenv("ANTHROPIC_BASE_URL", ""))
         if explicit:
             return explicit
-        # Provider 预设
         presets = {
             "kimi":     "https://api.moonshot.cn/anthropic",
             "glm":      "https://open.bigmodel.cn/api/anthropic",
@@ -69,8 +76,8 @@ class Settings:
 
     @property
     def claude_model(self) -> str:
-        # 按 provider 给默认模型名
-        env_model = os.getenv("CLAUDE_MODEL", "")
+        env_model = (self._session_get("CLAUDE_MODEL")
+                     or os.getenv("CLAUDE_MODEL", ""))
         if env_model:
             return env_model
         defaults = {
@@ -197,11 +204,24 @@ class Settings:
             encoding="utf-8",
         )
 
-    # ── Demo 模式（Phase I）────────────────────────────────
+    # ── Demo 模式（BYO-Key · 云端自动启用）────────────────────
     @property
     def demo_mode(self) -> bool:
-        """DEMO_MODE=true 时启用 BYO-Key 模式、禁用真实邮件发送等。"""
-        return os.getenv("DEMO_MODE", "false").lower() in ("true", "1", "yes")
+        """DEMO_MODE=true 时启用 BYO-Key 模式、禁用真实邮件发送。
+        自动识别：
+          1. env DEMO_MODE=true
+          2. 运行在 Streamlit Cloud（路径含 /mount/src/）
+          3. 运行在 HuggingFace Spaces（SPACE_ID 环境变量存在）
+        """
+        if os.getenv("DEMO_MODE", "").lower() in ("true", "1", "yes"):
+            return True
+        # Streamlit Cloud 特征路径
+        if str(_ROOT).startswith("/mount/src/"):
+            return True
+        # HuggingFace Spaces 特征
+        if os.getenv("SPACE_ID") or os.getenv("SPACE_AUTHOR_NAME"):
+            return True
+        return False
 
 
 @lru_cache
