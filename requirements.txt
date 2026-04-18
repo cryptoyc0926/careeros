@@ -1,0 +1,26 @@
+# ══════════════════════════════════════════════════════
+# CareerOS — Python Dependencies（项目根 · Streamlit Cloud 读这份）
+# ══════════════════════════════════════════════════════
+# 本地开发可用 web/requirements.txt（内容一致）
+
+# Core framework
+streamlit>=1.38.0
+anthropic>=0.39.0
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+pyyaml>=6.0
+
+# Document processing
+weasyprint>=62.0
+python-docx>=1.0.0
+pdfplumber>=0.10.0
+PyPDF2>=3.0.0
+beautifulsoup4>=4.12.0
+requests>=2.31.0
+
+# Email
+jinja2>=3.1.0
+
+# Data & analytics
+pandas>=2.0.0
+plotly>=5.18.0
