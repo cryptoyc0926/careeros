@@ -71,14 +71,13 @@ streamlit run web/app.py
 
 ---
 
-## 在线 Demo
+## 部署到自己机器
 
-点击下面的按钮 Fork 到你自己的 HuggingFace 账号，一键部署你自己的实例：
+按上面"5 分钟快速开始"跑起来就是完整功能版。
 
-[![Deploy to HF Spaces](https://huggingface.co/datasets/huggingface/badges/resolve/main/deploy-to-spaces-md.svg)](https://huggingface.co/spaces/new?template=cryptoyc0926/careeros)
-
-> **BYO-Key（自带 Key）模式**：你用自己的 Anthropic API Key，作者不收任何费用也不保存你的任何数据。
-> 详细部署指南见 [DEPLOY.md](./DEPLOY.md)。
+如果想把它挂到公网（让朋友用、或自己远程访问）：
+- 容器部署：已提供 `Dockerfile`，可上 Railway / HuggingFace Spaces / 个人 VPS
+- 完整方案见 [DEPLOY.md](./DEPLOY.md)
 
 ---
 
