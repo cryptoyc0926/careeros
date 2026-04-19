@@ -427,6 +427,26 @@ else:
     alert_warning("数据库尚未初始化，将在应用启动时自动创建。")
 
 # ══════════════════════════════════════════════════════════
+# 最近错误日志（session 级，关闭页面就清空）
+# ══════════════════════════════════════════════════════════
+divider()
+apple_section_heading(
+    "最近错误日志",
+    subtitle="本次浏览器会话里出现过的最近 20 条错误（关闭页面即清空，不上传任何地方）",
+)
+
+_err_buf = st.session_state.get("_error_log") or []
+if not _err_buf:
+    st.caption("（暂无错误记录）")
+else:
+    st.caption(f"共 {len(_err_buf)} 条错误。复制下面代码块可完整发给作者提 issue：")
+    _log_text = "\n\n".join(f"[{e['t']}]\n{e['msg']}" for e in _err_buf[::-1])
+    st.code(_log_text, language="text")
+    if st.button("清空错误日志", key="clear_error_log"):
+        st.session_state["_error_log"] = []
+        st.rerun()
+
+# ══════════════════════════════════════════════════════════
 # 目标公司管理（P0 / P1 / 排除清单 + 内推码）
 # ══════════════════════════════════════════════════════════
 divider()

@@ -365,10 +365,11 @@ def funnel_stage_card(label: str, count: int, rate_hint: str = "") -> None:
     )
 
 
-def diagnostic_alert(severity: str, message: str) -> None:
+def diagnostic_alert(severity: str, message: str, copyable: bool = False) -> None:
     """诊断信息条（Apple 风格，无 emoji，只用颜色+文字）。
 
     severity: success | info | warning | danger
+    copyable: True 时额外追加一个可复制的 code block（st.code 右上角自带 copy 按钮）
     """
     color, bg = COLORS.get(severity, COLORS["info"])
     st.markdown(
@@ -378,6 +379,20 @@ def diagnostic_alert(severity: str, message: str) -> None:
         f'border-left:3px solid {color};margin:{SP_2} 0">{message}</div>',
         unsafe_allow_html=True,
     )
+    # 同时把错误写入 session 错误缓冲，便于在「系统设置」里统一查看最近错误
+    if severity == "danger":
+        try:
+            buf = st.session_state.setdefault("_error_log", [])
+            import datetime as _dt
+            buf.append({"t": _dt.datetime.now().isoformat(timespec="seconds"), "msg": str(message)[:500]})
+            if len(buf) > 20:
+                del buf[:-20]
+        except Exception:
+            pass
+    # danger 自动启用 copyable；其他级别按传参
+    if copyable or severity == "danger":
+        with st.expander("📋 复制错误详情（给作者提 issue 时贴这个）", expanded=False):
+            st.code(str(message), language="text")
 
 
 # alert_* 便捷别名：用于替代原生 st.success / st.info / st.warning / st.error
@@ -393,8 +408,8 @@ def alert_warning(message: str) -> None:
     diagnostic_alert("warning", message)
 
 
-def alert_danger(message: str) -> None:
-    diagnostic_alert("danger", message)
+def alert_danger(message: str, copyable: bool = True) -> None:
+    diagnostic_alert("danger", message, copyable=copyable)
 
 
 def score_hero_card(score: int, verdict: str = "", hint: str = "") -> None:
