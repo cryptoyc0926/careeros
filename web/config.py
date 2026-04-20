@@ -58,9 +58,8 @@ class Settings:
     @property
     def anthropic_base_url(self) -> str:
         """自定义 API 端点。按 provider 提供预设：
-        - kimi:     https://api.moonshot.cn/anthropic
-        - glm:      https://open.bigmodel.cn/api/anthropic
-        - deepseek: https://api.deepseek.com/anthropic
+        - kimi/glm/deepseek: Anthropic 兼容端点
+        - codex/openai:      OpenAI 协议端点（走 llm_client 的 OpenAI adapter）
         留空则使用 Anthropic 官方。
         """
         explicit = (self._session_get("ANTHROPIC_BASE_URL")
@@ -71,6 +70,8 @@ class Settings:
             "kimi":     "https://api.moonshot.cn/anthropic",
             "glm":      "https://open.bigmodel.cn/api/anthropic",
             "deepseek": "https://api.deepseek.com/anthropic",
+            "codex":    "https://navacodex.shop/v1",
+            "openai":   "https://api.openai.com/v1",
         }
         return presets.get(self.llm_provider, "")
 
@@ -85,8 +86,45 @@ class Settings:
             "kimi":      "kimi-k2-0905-preview",
             "glm":       "glm-4.6",
             "deepseek":  "deepseek-chat",
+            "codex":     "gpt-5.4",
+            "openai":    "gpt-4o-mini",
         }
         return defaults.get(self.llm_provider, "claude-sonnet-4-6")
+
+    # ── OpenAI-wire providers 判断 ───────────────────────────
+    @property
+    def is_openai_wire(self) -> bool:
+        """当前 provider 是否走 OpenAI Chat Completions 协议（而非 Anthropic Messages）。"""
+        return self.llm_provider in ("codex", "openai")
+
+    # ── 公开池（Codex 共享 Key）──────────────────────────────
+    @property
+    def codex_shared_key(self) -> str:
+        """Streamlit Cloud Secrets 里配的公开池 Key。用户没填自己 Key 且选 codex 时用此 Key。"""
+        # st.secrets 在本地无 secrets.toml 时会 raise；做防御性读取
+        try:
+            import streamlit as st
+            return str(st.secrets.get("CODEX_SHARED_KEY", "") or "")
+        except Exception:
+            return os.getenv("CODEX_SHARED_KEY", "")
+
+    @property
+    def codex_pool_monthly_budget_usd(self) -> float:
+        """公开池月预算上限（美元）。超过就禁用公开池。"""
+        try:
+            import streamlit as st
+            return float(st.secrets.get("CODEX_POOL_BUDGET_USD", 10.0) or 10.0)
+        except Exception:
+            return float(os.getenv("CODEX_POOL_BUDGET_USD", "10.0") or 10.0)
+
+    @property
+    def codex_per_session_budget_usd(self) -> float:
+        """单个访客 session 级预算上限。"""
+        try:
+            import streamlit as st
+            return float(st.secrets.get("CODEX_PER_SESSION_USD", 0.5) or 0.5)
+        except Exception:
+            return float(os.getenv("CODEX_PER_SESSION_USD", "0.5") or 0.5)
 
     # ── Email (SMTP) ────────────────────────────────────────
     @property
@@ -145,7 +183,14 @@ class Settings:
 
     @property
     def has_anthropic_key(self) -> bool:
-        return bool(self.anthropic_api_key and self.anthropic_api_key not in ("", "sk-ant-your-key-here"))
+        # 用户自己填的 Key
+        user_key = self.anthropic_api_key
+        if user_key and user_key not in ("", "sk-ant-your-key-here"):
+            return True
+        # Codex 公开池兜底：provider=codex 且 secrets 里有 shared key → 视为可用
+        if self.llm_provider == "codex" and self.codex_shared_key:
+            return True
+        return False
 
     @property
     def has_custom_base_url(self) -> bool:

@@ -12,6 +12,7 @@ import hashlib
 import yaml
 from pathlib import Path
 from config import settings
+from services.resume_prompt_rules import FULL_STYLE_RULES, RULE_VERSION
 
 import anthropic
 
@@ -237,28 +238,26 @@ def calculate_fit_score(jd_parsed: dict, master_resume_path: Path = None) -> flo
 # 简历生成
 # ═══════════════════════════════════════════════════════════════
 
-RESUME_SYSTEM = """你是一位资深的简历撰写专家。你的任务是根据目标职位描述和候选人的经历素材，生成一份量身定制的简历和求职信。
+RESUME_SYSTEM = f"""你是一位资深的简历撰写专家。你的任务是根据目标职位描述和候选人的经历素材，生成一份量身定制的简历和求职信。
 
 ## 内容规则
 1. 只使用提供的素材中的成就，不要编造。
 2. 保留原始数据和指标，不夸大。
 3. 改写要点时匹配 JD 的用语和关注点。
 4. 简历控制在一页以内。
+5. 用量化结果开头（如「延迟降低 62%」而非「成功降低了延迟」）。
+6. 自然使用行业术语，不堆砌关键词。
+7. 包含具体细节，展示真实实操经验。
+8. 语气直接自信，不用虚词和修饰语。
 
-## 风格规则（避免 AI 检测）
-5. 句式长短交替：短陈述句（5-8字）与长复合句混合。
-6. 禁用词：利用、赋能、驱动、深耕、赋能、助力、打造、抓手。
-7. 用量化结果开头（如"延迟降低62%"而非"成功降低了延迟"）。
-8. 自然使用行业术语，不堆砌关键词。
-9. 包含具体细节，展示真实实操经验。
-10. 语气直接自信，不用虚词和修饰语。
+{FULL_STYLE_RULES}
 
 ## 输出格式（严格遵守，不要加其他内容）
 ---RESUME_START---
-[Markdown 格式的简历]
+[Markdown 格式的简历，按上述加粗规则使用 **...** 标记]
 ---RESUME_END---
 ---COVER_LETTER_START---
-[3-4段的求职信]
+[3-4 段的求职信]
 ---COVER_LETTER_END---"""
 
 

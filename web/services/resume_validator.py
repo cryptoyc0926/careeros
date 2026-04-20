@@ -4,13 +4,13 @@
 失败策略：任一 hard_error → 抛 ValidationError，由 page 层 catch 并渲染红色 banner + diff。
 不自动重试（按 T6-Q2=B）。
 
-规则（按 T6-Q1 你的决定）：
+规则（v2.0, 2026-04-20 更新，配合 resume_prompt_rules.py v2.0）：
 
 HARD errors:
   - 公司名被改
   - 日期被改
   - 学校 / 专业 / 学历被改（tailored 里若包含 education 字段必须与 master 一致）
-  - 原文数字被改或丢失
+  - 原文**数字序列**被改或丢失（v2.0: 按纯数字 token 比较，兼容新旧加粗格式）
   - bullet 数量变化
   - 新增原文没有的项目 / 实习
   - 数字没加 <b> 标签（AI 输出里裸露的数字不允许）
@@ -19,6 +19,12 @@ HARD errors:
 Warnings（不阻断）:
   - bullet 长度变化 > 30%
   - profile 字数不在 [70, 130]
+
+v2.0 改动要点：
+  - 数字对齐从「<b>XX 单位</b> 整串相等」改为「数字 token 序列包含」
+    旧：master `<b>9000+ 粉</b>` vs tailored `<b>9,000+</b> 粉` → 硬错
+    新：只要两者都能提取出 {{"9000+"}} 数字集合即通过
+  - 兼容新加粗规则：`<b>` 内只包纯数字、单位留在 b 外
 """
 
 from __future__ import annotations
@@ -81,6 +87,42 @@ def _strip_html(s: str) -> str:
 def _extract_bold_values(s: str) -> list[str]:
     """从 bullet 里抽取所有 <b>…</b> 里的值，保留原顺序、去前后空白。"""
     return [m.group(1).strip() for m in _BOLD_RE.finditer(s or "")]
+
+
+# v2.0 新增：从整条文本（含 HTML 外）提取「数字 token 集合」
+# 用于兼容新旧加粗格式的数字对齐校验
+_NUM_TOKEN_RE = re.compile(
+    r"\d+(?:[.,，]\d+)*(?:\s*[万千])?(?:\s*[wWkK])?[%+]?",
+    re.UNICODE,
+)
+
+
+def _extract_number_tokens(s: str) -> set[str]:
+    """从整段文本（剥 HTML 后）提取所有「数字 token」，返回标准化集合。
+
+    标准化规则：
+      - 去掉英文/中文逗号、空格
+      - 保留小数点、+、%、万、千、w、k
+      - 大小写统一为小写
+      - 丢弃长度 < 2 且无后缀符号的单数字（避免"6 个模块"这种配置量干扰）
+
+    用途：校验 master 的数字序列是否完整保留在 tailored 里，不关心加粗格式怎么变。
+    """
+    if not s:
+        return set()
+    text = re.sub(r"<[^>]+>", "", s)
+    tokens: set[str] = set()
+    for m in _NUM_TOKEN_RE.finditer(text):
+        raw = m.group(0)
+        norm = re.sub(r"[,，\s]", "", raw).lower()
+        if not norm:
+            continue
+        # 过滤：纯个位数且无任何单位/符号的不算关键数字（避免"6"、"3"这种配置数字干扰）
+        has_suffix = any(c in norm for c in "+%万千wk.")
+        has_multi_digit = len(re.sub(r"[^\d]", "", norm)) >= 2
+        if has_suffix or has_multi_digit:
+            tokens.add(norm)
+    return tokens
 
 
 def _find_naked_numbers(s: str) -> list[str]:
@@ -169,18 +211,20 @@ def validate_tailored(
                 m_b = m_bullets[bi]
                 t_b = t_bullets[bi]
 
-                # rule 4a: 原文数字必须全部保留（按 <b> 值匹配）
-                m_nums = _extract_bold_values(m_b)
-                t_nums = _extract_bold_values(t_b)
-                missing = [n for n in m_nums if n not in t_nums]
+                # rule 4a (v2.0): 原文数字 token 必须全部保留（兼容新旧加粗格式）
+                # 旧逻辑按 <b>...</b> 内字符串完整相等对齐，新规则下加粗范围变了会误报
+                # 新逻辑：提取整条 bullet 的纯数字 token 集合做包含校验
+                m_tokens = _extract_number_tokens(m_b)
+                t_tokens = _extract_number_tokens(t_b)
+                missing = sorted(m_tokens - t_tokens)
                 if missing:
                     report.hard_errors.append(ValidationIssue(
                         severity="hard",
                         rule="number_dropped",
                         location=f"{section}[{i}].bullets[{bi}]",
                         message=f"原文数字丢失：{', '.join(missing)}",
-                        expected=", ".join(m_nums),
-                        actual=", ".join(t_nums),
+                        expected=", ".join(sorted(m_tokens)),
+                        actual=", ".join(sorted(t_tokens)),
                     ))
 
                 # rule 4b: 裸露数字（AI 输出里没加 <b> 的数字）→ 硬错
@@ -286,10 +330,11 @@ if __name__ == "__main__":
         "internships": [],
         "education": [{"school": "浙工商", "major": "统计", "date": "2022-2026"}],
     }
+    # v2.0 新格式：数字包 <b>，单位在 b 外
     good = {
         "projects": [
             {"company": "AI Trading", "role": "用户增长运营", "date": "2024.03 - 至今",
-             "bullets": ["AI 增长：做到 <b>9000+</b> 粉丝", "商业化 <b>20+</b> 次合作"]}
+             "bullets": ["AI 增长：做到 <b>9,000+</b> 粉丝（逗号版也通过）", "商业化 <b>20+</b> 次合作"]}
         ],
         "internships": [],
         "profile": "有 AI 增长运营和数据驱动经验的 2026 届候选人" * 3,
