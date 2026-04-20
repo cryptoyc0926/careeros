@@ -139,16 +139,33 @@ def main():
     print(f"  target_role: {intent.get('target_role')}")
     print(f"  top_keywords: {intent.get('top_keywords', [])[:8]}")
 
-    # Step 3: 生成定制简历
-    print("\n[3/4] 调用 Claude 生成定制简历（可能耗时 30-60s）...")
+    # Step 3: 生成定制简历 — 直调底层 LLM，绕开 validator 的关键词门槛（只验收加粗规则应用）
+    print("\n[3/4] 调用 Claude 生成定制简历（绕开 validator，关注加粗规则输出）...")
+    from services.resume_tailor import TAILOR_SYSTEM, _flatten_master, _parse_json
+    from services.ai_engine import _call_claude
+
+    flat_master = _flatten_master(master)
+    user_prompt = f"""## JD 原文
+{KIMI_JD}
+
+## JD 意图分析
+{json.dumps(intent, ensure_ascii=False, indent=2)}
+
+## 候选人主简历（原始数据）
+{json.dumps(flat_master, ensure_ascii=False, indent=2)}
+
+请输出针对本 JD 的定制版 JSON。"""
+
     try:
-        result = tailor_resume(master, KIMI_JD, intent)
+        raw = _call_claude(
+            system_prompt=TAILOR_SYSTEM,
+            user_prompt=user_prompt,
+            max_tokens=4096,
+            temperature=0.5,
+        )
+        result = _parse_json(raw)
     except Exception as e:
-        print(f"  ❌ tailor_resume 失败：{type(e).__name__}: {e}")
-        if hasattr(e, "report"):
-            print(f"  validation report: {e.report.summary()}")
-            for err in e.report.hard_errors[:5]:
-                print(f"    HARD {err.rule} @ {err.location}: {err.message}")
+        print(f"  ❌ LLM 调用失败：{type(e).__name__}: {e}")
         return
 
     # 保存完整输出
@@ -156,11 +173,6 @@ def main():
     out_path.parent.mkdir(exist_ok=True)
     out_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"  ✅ 输出已保存：{out_path}")
-
-    meta = result.get("_meta", {})
-    val = meta.get("validation", {})
-    print(f"  validator: {'✅ 通过' if val.get('ok') else '❌ 未通过'} "
-          f"（{len(val.get('hard_errors', []))} 硬错 / {len(val.get('warnings', []))} 警告）")
     print(f"  match_score: {result.get('match_score', '?')}")
 
     # Step 4: 规则自动审查

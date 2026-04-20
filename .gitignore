@@ -40,8 +40,12 @@ web/templates/yangchao_photo.*
 .env
 .env.local
 .env.*.local
+.env.bak*
+.env.*.bak*
 *.env
+*.env.bak*
 web/.env
+web/.env.bak*
 .streamlit/secrets.toml
 web/.streamlit/secrets.toml
 
