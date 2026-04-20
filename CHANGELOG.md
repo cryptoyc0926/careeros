@@ -4,6 +4,31 @@
 
 ---
 
+## [0.3.0] — 2026-04-20（Codex/OpenAI 兼容层 · 公开池试玩）
+
+### ✨ 新增
+
+- **OpenAICompatClient 适配层** `web/services/llm_client.py`
+  - 业务层继续用 Anthropic 签名 (`client.messages.create`)，底层按 provider 路由
+  - `codex` / `openai` 两个 provider 走 `chat.completions`，自动转换 messages 格式
+  - 统一 `_AnthropicLikeResponse` 包装，调用点零改动
+- **provider 预设扩展**
+  - 🎁 **Codex 公开池**（https://navacodex.shop/v1 · gpt-5.4）— 初期免费共享，访客开箱即用
+  - **OpenAI 官方**（https://api.openai.com/v1 · gpt-4o-mini）
+  - `is_openai_wire` 路由判断；`codex_shared_key` / `codex_per_session_budget_usd` 从 `st.secrets` 读取
+- **公开池试玩机制**
+  - 用户无 Key 但选 codex + secrets 有 `CODEX_SHARED_KEY` → 自动走共享 Key
+  - session 级用量透明展示（初期阶段不做额度拦截）
+  - `has_anthropic_key` 扩展为「考虑公开池可用性」
+- **设置页 UI** 加 provider 下拉、公开池状态 banner、申请 Key 链接
+
+### 🛠 改动
+
+- `requirements.txt` 新增 `openai>=1.40`
+- 默认 `llm_provider` 从 `anthropic` 改为 `codex`（新访客打开设置页默认勾选 Codex）
+
+---
+
 ## [0.2.0] — 2026-04-20（简历规则体系 v2.0）
 
 ### ✨ 新增
@@ -90,13 +115,13 @@
 
 ## 未来版本（roadmap）
 
-### [0.2.0] 计划中
-- [ ] 支持 OpenAI / Gemini / LiteLLM 抽象层
+### [0.4.0] 计划中
 - [ ] Onboarding 引导页（首启动 4 步向导）
-- [ ] 英文 UI
+- [ ] 英文 UI / i18n
 - [ ] 主简历 PDF 上传解析失败时 fallback 到手填
+- [ ] Gemini / LiteLLM provider（现已支持 Anthropic / OpenAI / Codex 三路）
 
-### [0.3.0] 远期
+### [0.5.0] 远期
 - [ ] PWA 离线模式
-- [ ] 社区功能（故事库共享）
+- [ ] 社区功能（故事库共享 · 模板市场）
 - [ ] 移动端响应式

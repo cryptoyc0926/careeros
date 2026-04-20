@@ -6,12 +6,14 @@
 [![License](https://img.shields.io/badge/License-MIT-green)](./LICENSE)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.38%2B-ff4b4b)](https://streamlit.io/)
 [![Claude](https://img.shields.io/badge/Claude_API-Anthropic-9d6cff)](https://www.anthropic.com/)
+[![OpenAI](https://img.shields.io/badge/OpenAI-compatible-10a37f)](https://platform.openai.com/)
+[![Version](https://img.shields.io/badge/version-v0.3.0-blueviolet)](./CHANGELOG.md)
 
 ---
 
 ## 它是什么
 
-**CareerOS** 是一个本地跑的求职一体化 webapp。你把**主简历**和**目标岗位 JD** 丢给它，AI（Claude）会：
+**CareerOS** 是一个本地跑的求职一体化 webapp。你把**主简历**和**目标岗位 JD** 丢给它，AI 会：
 
 1. 给每个岗位算一个 **match_score**，告诉你匹配度和差距
 2. **改写**你的主简历，生成该岗位量身定制的版本（保留所有硬事实不编造）
@@ -20,11 +22,44 @@
 
 所有数据都在你自己的电脑上（SQLite 单文件），API Key 也是你自己的，作者看不到任何东西。
 
+**支持的 LLM Provider**（v0.3.0 起，设置页下拉切换）：
+
+| Provider | 协议 | 默认模型 | 场景 |
+|---|---|---|---|
+| 🎁 **Codex 公开池** | OpenAI wire | `gpt-5.4` | 初期免费共享，**零配置试玩** |
+| **OpenAI 官方** | OpenAI wire | `gpt-4o-mini` | 有 `sk-...` 的用户 |
+| **Anthropic 官方** | Anthropic wire | `claude-sonnet-4-6` | 有 `sk-ant-...` 的用户 |
+| 自定义代理 | 兼容 Anthropic | 自定义 | 国内反代 / 私有部署 |
+
 ---
 
 ## 截图
 
-![截图占位 — 将在 docs/screenshots/ 发布后补上](https://via.placeholder.com/900x500?text=CareerOS+Screenshots+coming+soon)
+> Nature × Apple 设计语言，17 个页面 / 29 个组件。下面 6 张图对应 README 后文提到的核心能力。
+
+### 首页 · 今天该做什么
+![首页](docs/screenshots/home.png)
+岗位待处理 · P0 重点机会 · 已投递 / 面试 Offer —— 打开就知道今天的动作清单。
+
+### 添加岗位 JD · 4 种入口
+![JD 入口](docs/screenshots/jd_input.png)
+关键词全网搜（依赖 Anthropic `web_search`）/ 链接抓取（Moka · 飞书）/ 智能粘贴 / 手动 / 上传 PDF。
+
+### 主简历 · 7 个 tab 的底稿
+![主简历](docs/screenshots/master_resume.png)
+基本信息 / 个人总结 / 项目 / 实习 / 技能 / 教育 / 文件上传 —— 所有定制版都从这份底稿生出来。
+
+### 在线定制 · JD × 主简历 × 实时预览
+![简历定制](docs/screenshots/resume_tailor.png)
+左栏贴 JD、中栏改段落、右栏 1:1 预览新 PDF（可与原始 PDF 对照）。历史版本自动沉淀。
+
+### 投递看板 · 6 × 2 状态列
+![看板](docs/screenshots/pipeline.png)
+已收藏 → 已生成简历 → 已投递 → 跟进中 → 面试中 → Offer，外加终态（已拒绝 / 已放弃）。
+
+### 数据分析 · 漏斗诊断转化
+![分析](docs/screenshots/analytics.png)
+求职转化漏斗、P0 投递率、岗位等级分布、P0 待行动清单 —— 看清每一环在哪拖后腿。
 
 ---
 
@@ -51,7 +86,7 @@ streamlit run web/app.py
 第一次打开会引导你：
 
 1. **填个人画像**（姓名/学校/专业/目标岗位，3 分钟）
-2. **粘贴 Claude API Key**（去 [Anthropic Console](https://console.anthropic.com/) 申请，免费额度够试用）
+2. **选 Provider**（公网 demo 默认走 🎁 Codex 公开池，零配置试玩；本地自建推荐 Anthropic/OpenAI 官方，Key 填 `.env` 或 UI 里）
 3. **填主简历** 或上传 PDF/DOCX（系统会解析，解析失败也能手填）
 4. **加第一个目标岗位**（粘贴 JD 链接或文本）
 5. 点「生成定制简历」→ **下载 PDF**
@@ -84,10 +119,11 @@ streamlit run web/app.py
 ## 技术栈
 
 - **Frontend**：Streamlit 1.38+（17 个页面 / 29 个 Apple 风组件）
-- **AI**：Anthropic Claude（Opus/Sonnet 均可）
-- **Storage**：SQLite（纯文件，零依赖）
-- **PDF**：WeasyPrint + Jinja2
+- **AI**：Anthropic Claude（Opus/Sonnet）+ OpenAI 兼容层（Codex 公开池 / GPT 系列）
+- **Storage**：SQLite（纯文件，零依赖）· 数据库 schema 19 张表
+- **PDF**：WeasyPrint + Jinja2（自定义 resume 模板）
 - **JD 抓取**：requests + BeautifulSoup（SPA 站点可选 Playwright）
+- **Prompt 规则**：统一规则常量（`services/resume_prompt_rules.py`）· BOLD_RULES / DEAI_RULES
 - **Python**：3.10+
 
 ---
@@ -117,7 +153,7 @@ streamlit run web/app.py
 | **云端 API Key 存储** | 关闭浏览器 session 就清空 | BYO-Key 模式设计如此（作者零成本，用户零信任风险） |
 | **中国区招聘网站抓取** | BOSS/猎聘/飞书等需 Playwright | 本地部署可装；云端不支持，改用「智能粘贴」或「关键词搜索」 |
 | **简历上传自动填** | 对**部分格式**可能漏字段 | 能识别 90%+ 标准格式；特殊格式切 AI 解析或手动补 |
-| **英文版 / i18n** | ❌ 暂不计划 | 本版本专注华语区求职者 |
+| **英文版 / i18n** | 🚧 0.4.0 roadmap | 本版本专注华语区求职者 |
 
 遇到解析出错的简历 / 用起来有反直觉的地方，欢迎 [提 issue](https://github.com/cryptoyc0926/careeros/issues) 附：
 1. 失败的简历 PDF（可先去隐私化）
@@ -127,8 +163,11 @@ streamlit run web/app.py
 
 - [x] v5 Apple UI 收敛（20 节 CSS + 29 组件 + Nature × Apple 风格）
 - [x] 隐私清理 + 通用化开源（v0.1.0）
+- [x] 简历规则体系 v2.0（统一加粗/DEAI 规则常量，v0.2.0）
+- [x] OpenAI/Codex 协议兼容 + 公开池试玩（v0.3.0）
+- [ ] Gemini / LiteLLM 抽象层
 - [ ] 英文版（多语言）
-- [ ] 支持 OpenAI / Gemini / 本地模型（通过 LiteLLM 抽象层）
+- [ ] Onboarding 引导页（首启动 4 步向导）
 - [ ] PWA 离线模式
 - [ ] 社区功能（故事库共享、模板市场）
 

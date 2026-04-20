@@ -112,7 +112,15 @@ docker run -d \
 
 ### Q: 能改成 OpenAI 或 Gemini 吗？
 
-目前硬绑 Anthropic SDK。Roadmap 里会加 LiteLLM 抽象层（PR 欢迎）。
+**OpenAI 已支持（v0.3.0）**。设置页 → Provider 下拉可切换：
+
+- 🎁 **Codex 公开池**（初期阶段免费共享，开箱即用，无需自备 Key）
+- **OpenAI 官方**（填自己的 `sk-...`）
+- **Anthropic 官方**（填 `sk-ant-...`）
+
+业务层仍用 Anthropic 签名，底层通过 `OpenAICompatClient` 走 `chat.completions`，调用点零改动。
+
+Gemini / LiteLLM 抽象层在 0.4.0 roadmap（PR 欢迎）。
 
 ### Q: Playwright 在 HF Spaces 装不上怎么办？
 
