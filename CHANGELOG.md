@@ -4,6 +4,45 @@
 
 ---
 
+## [0.2.0] — 2026-04-20（简历规则体系 v2.0）
+
+### ✨ 新增
+
+- **统一规则常量** `web/services/resume_prompt_rules.py`（RULE_VERSION = "2.0"）
+  - `BOLD_RULES_BRIEF`：加粗规则精简版，供 system prompt 嵌入
+  - `DEAI_RULES_BRIEF`：中文语言去 AI 腔约束
+  - `FULL_STYLE_RULES`：两者组合，一站式引用
+- **配套文档**：
+  - `web/prompts/resume_bold_rules.md` — 157 行完整加粗规范（含正误对照表、HTML 实现、自检清单）
+  - `web/prompts/resume_system.md` — 嵌入 DEAI + 加粗精简规则
+
+### 🛠 改动
+
+- **3 处硬编码 system prompt 改为引用统一规则常量**
+  - `ai_engine.py::RESUME_SYSTEM`
+  - `resume_tailor.py::TAILOR_SYSTEM`
+  - `resume_tailor.py::SECTION_REWRITE_SYSTEM`
+- **加粗规则从「整段 `<b>数字 单位</b>`」升级为「只粗纯数字 `<b>数字</b> 单位`」**
+  - 示例：`<b>9,000+</b> 粉`（而非 `<b>9,000+ 粉</b>`）
+  - 过程描述（「40 分钟压到 10 分钟」「30 秒产出」）整句不加粗
+  - 对比段（`<b>0 → 9,000+</b>`、`<b>1,048 万 → 1,262 万</b>`）整段加粗
+- **validator 数字校验改为 token 序列对齐**（`resume_validator.py`）
+  - 新增 `_extract_number_tokens()`：从整条 bullet 提取纯数字 token 集合
+  - 兼容旧格式 master + 新格式 tailored，避免误报
+  - 过滤配置量（「6 个模块」「3 家公司」）避免干扰
+
+### 🧪 测试
+
+- `python3 -m services.resume_validator` smoke test 通过
+- Token 提取验证：`<b>9000+ 粉</b>` 和 `<b>9,000+</b> 粉` 都映射到 `{"9000+"}`
+
+### 📋 Kimi 版定制简历交付
+
+- `/Users/Zhuanz/Desktop/OFFER/杨超_简历_Kimi版.pdf`（一页 A4，针对国内社媒 KOL 增长运营实习）
+- HTML 源：`杨超_简历_Kimi版.html`（Kaiti SC 姓名字体 + 灰底 section 标题 + 精细加粗）
+
+---
+
 ## [0.1.0] — 2026-04-17（首次开源发布）
 
 🎉 **首个公开版本**。经过 6 周密集迭代，从私人求职工具演进为可被任何人 Fork 使用的通用求职一体化 webapp。

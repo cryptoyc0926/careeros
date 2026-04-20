@@ -115,11 +115,11 @@ current_env = _read_env()
 
 _PROVIDERS = {
     "codex": {
-        "label":     "🎁 Codex 公开池（免费试玩 · 推荐新人）",
+        "label":     "🎁 Codex 免费共享（默认 · 无需注册）",
         "base_url":  "https://navacodex.shop/v1",
         "model":     "gpt-5.4",
         "key_link":  "https://navacodex.shop/register",
-        "hint":      "直接使用，留空 Key 会走作者公开池（session 级 $0.5 额度）。想长期用请自己兑换 Key。",
+        "hint":      "CareerOS 默认 Provider · 无需填 Key 直接用（作者共享余额 · 用完为止）· 想用自己的也可以填下面",
         "wire":      "openai",
     },
     "anthropic": {
@@ -248,13 +248,12 @@ _using_shared_pool = (
 )
 if _using_shared_pool:
     try:
-        from services.llm_client import get_pool_remaining_usd
-        _remain = get_pool_remaining_usd()
-        _budget = settings.codex_per_session_budget_usd
+        from services.llm_client import get_pool_spent_usd
+        _spent = get_pool_spent_usd()
         alert_info(
-            f"🎁 **你正在使用 Codex 公开池试玩**（session 级 ${_budget:.2f} 额度 · 剩余 ${_remain:.3f}）"
-            f"· 用完后请到这里填入你自己的 Key，或兑换码申请新 Key："
-            f" [navacodex.shop/register](https://navacodex.shop/register)"
+            f"🎁 **免费试用中** · 你正在使用 CareerOS 公开共享 Key（无需注册、无需填 Key、不做拦截）。"
+            f"本次会话已消耗约 `${_spent:.4f}` · 功能完全放开，不满意随时到这里填自己的 Key。"
+            f"[如需自己兑换 Key 请点这里 →](https://navacodex.shop/register)"
         )
     except Exception:
         pass

@@ -49,7 +49,7 @@ def extract_jd_intent(jd_text: str) -> dict:
 
 
 # ── Step 2: 整份简历定制 ─────────────────────────────────
-TAILOR_SYSTEM = f"""你是一位顶级的中文简历定制顾问，服务对象是求职候选人（见下方主简历提供的个人信息）。
+TAILOR_SYSTEM = """你是一位顶级的中文简历定制顾问，服务对象是求职候选人（见下方主简历提供的个人信息）。
 
 你的任务：根据目标 JD 的意图，把候选人的「主简历」改写成「针对本岗位的定制版」。
 
@@ -66,7 +66,7 @@ TAILOR_SYSTEM = f"""你是一位顶级的中文简历定制顾问，服务对象
 - 如果 JD 是「产品运营」→ 突出产品迭代、需求洞察、用户反馈
 - Profile 个人总结整段重写，融入 JD 的 top_keywords
 
-{FULL_STYLE_RULES}
+__STYLE_RULES_PLACEHOLDER__
 
 ## 输出格式（严格 JSON，不要任何其他文字）
 {
@@ -91,7 +91,7 @@ TAILOR_SYSTEM = f"""你是一位顶级的中文简历定制顾问，服务对象
   ],
   "match_score": 0-100 的匹配度整数,
   "change_notes": "一段话说明你做了哪些改动及为什么（≤150字）"
-}"""
+}""".replace("__STYLE_RULES_PLACEHOLDER__", FULL_STYLE_RULES)
 
 
 def tailor_resume(master: dict, jd_text: str, jd_intent: dict | None = None) -> dict:
@@ -179,7 +179,7 @@ def tailor_resume(master: dict, jd_text: str, jd_intent: dict | None = None) -> 
 
 
 # ── Step 3: 单段重写 ─────────────────────────────────────
-SECTION_REWRITE_SYSTEM = f"""你是简历单段改写器。用户给你一段原文 + JD 方向，你返回改写后的同等长度文本。
+SECTION_REWRITE_SYSTEM = """你是简历单段改写器。用户给你一段原文 + JD 方向，你返回改写后的同等长度文本。
 
 硬规则：
 - 原文所有数字必须全部保留（数值、百分比、单位一个都不能丢）
@@ -187,7 +187,7 @@ SECTION_REWRITE_SYSTEM = f"""你是简历单段改写器。用户给你一段原
 - 不编造新事实
 - 只输出改写后的纯文本，不要解释、不要 markdown、不要 JSON
 
-{BOLD_RULES_BRIEF}"""
+__BOLD_RULES_PLACEHOLDER__""".replace("__BOLD_RULES_PLACEHOLDER__", BOLD_RULES_BRIEF)
 
 
 def rewrite_section(original: str, jd_intent: dict, hint: str = "") -> str:

@@ -47,8 +47,9 @@ class Settings:
 
     @property
     def llm_provider(self) -> str:
+        # 默认 provider = codex（免费公开池），新访客开箱即用
         return (self._session_get("LLM_PROVIDER")
-                or os.getenv("LLM_PROVIDER", "anthropic")).lower()
+                or os.getenv("LLM_PROVIDER", "codex")).lower()
 
     @property
     def anthropic_api_key(self) -> str:

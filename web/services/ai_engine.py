@@ -238,7 +238,7 @@ def calculate_fit_score(jd_parsed: dict, master_resume_path: Path = None) -> flo
 # 简历生成
 # ═══════════════════════════════════════════════════════════════
 
-RESUME_SYSTEM = f"""你是一位资深的简历撰写专家。你的任务是根据目标职位描述和候选人的经历素材，生成一份量身定制的简历和求职信。
+RESUME_SYSTEM = """你是一位资深的简历撰写专家。你的任务是根据目标职位描述和候选人的经历素材，生成一份量身定制的简历和求职信。
 
 ## 内容规则
 1. 只使用提供的素材中的成就，不要编造。
@@ -250,7 +250,7 @@ RESUME_SYSTEM = f"""你是一位资深的简历撰写专家。你的任务是根
 7. 包含具体细节，展示真实实操经验。
 8. 语气直接自信，不用虚词和修饰语。
 
-{FULL_STYLE_RULES}
+__STYLE_RULES_PLACEHOLDER__
 
 ## 输出格式（严格遵守，不要加其他内容）
 ---RESUME_START---
@@ -258,7 +258,7 @@ RESUME_SYSTEM = f"""你是一位资深的简历撰写专家。你的任务是根
 ---RESUME_END---
 ---COVER_LETTER_START---
 [3-4 段的求职信]
----COVER_LETTER_END---"""
+---COVER_LETTER_END---""".replace("__STYLE_RULES_PLACEHOLDER__", FULL_STYLE_RULES)
 
 
 def _pre_select_achievements(jd_parsed: dict, resume_data: dict) -> list[dict]:

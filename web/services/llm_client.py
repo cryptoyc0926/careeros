@@ -77,13 +77,16 @@ def _accumulate_pool_spend(cost_usd: float) -> float:
 
 
 def get_pool_remaining_usd() -> float:
-    """查询当前 session 公开池剩余预算（供 UI 显示）。"""
+    """查询当前 session 公开池剩余预算（供 UI 显示）。
+    初期阶段：不做限额，这个函数仅为兼容旧 UI 代码保留，永远返回 "无限"。"""
+    return float("inf")
+
+
+def get_pool_spent_usd() -> float:
+    """返回当前 session 已累计花费（供 UI 透明展示用）。"""
     try:
-        from config import settings
         import streamlit as st
-        spent = float(st.session_state.get("_pool_spend_usd", 0.0) or 0.0)
-        budget = settings.codex_per_session_budget_usd
-        return max(0.0, budget - spent)
+        return float(st.session_state.get("_pool_spend_usd", 0.0) or 0.0)
     except Exception:
         return 0.0
 
@@ -126,14 +129,8 @@ class _MessagesProxy:
     def create(self, *, model: str, messages: list[dict], system: str | None = None,
                max_tokens: int = 1024, temperature: float = 0.7,
                tools: list | None = None, **_kwargs) -> _AnthropicLikeResponse:
-        # 公开池预算前置检查
-        if self._using_shared_pool:
-            remaining = get_pool_remaining_usd()
-            if remaining <= 0:
-                raise RuntimeError(
-                    "公开池试玩额度已用完（本次会话）。请到「系统设置 → LLM 配置」填入你自己的 API Key，"
-                    "或关闭浏览器重开获得新 session。"
-                )
+        # 初期阶段：公开池无限量免费使用，不做 session 级额度拦截
+        # （如果将来需要防刷，只需在这里恢复 get_pool_remaining_usd() 检查即可）
 
         # Anthropic messages → OpenAI messages
         oa_msgs = []
@@ -151,7 +148,7 @@ class _MessagesProxy:
                 c = "\n".join(parts)
             oa_msgs.append({"role": m["role"], "content": str(c)})
 
-        # 调用 OpenAI
+        # 调用 OpenAI chat.completions
         resp = self._oa.chat.completions.create(
             model=model,
             messages=oa_msgs,
@@ -163,7 +160,7 @@ class _MessagesProxy:
         text = choice.message.content if choice and choice.message else ""
         usage = getattr(resp, "usage", None)
 
-        # 公开池额度累计
+        # 仅记录累计花费（给设置页显示用量透明用），不做任何拦截
         if self._using_shared_pool and usage is not None:
             cost = _estimate_cost_usd(model,
                                        getattr(usage, "prompt_tokens", 0) or 0,
