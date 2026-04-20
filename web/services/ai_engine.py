@@ -21,16 +21,13 @@ import time
 import httpx
 
 
-def _get_client() -> anthropic.Anthropic:
-    """创建 Anthropic 客户端，支持自定义 base_url，配置合理超时。"""
-    kwargs = {
-        "api_key": settings.anthropic_api_key,
-        "timeout": httpx.Timeout(120.0, connect=15.0),  # 连接 15s，总计 120s
-        "max_retries": 0,  # 我们自己控制重试逻辑
-    }
-    if settings.has_custom_base_url:
-        kwargs["base_url"] = settings.anthropic_base_url
-    return anthropic.Anthropic(**kwargs)
+def _get_client():
+    """构造 LLM 客户端，按 settings.llm_provider 路由：
+      - Anthropic-wire（anthropic/kimi/glm/deepseek）→ 原生 Anthropic SDK（支持 stream）
+      - OpenAI-wire（codex/openai）→ OpenAICompatClient adapter（只支持 create）
+    """
+    from services.llm_client import make_client
+    return make_client()
 
 
 class AIError(Exception):
@@ -56,21 +53,34 @@ def _call_claude(
     client = _get_client()
     last_error = None
 
+    # OpenAI-wire（codex/openai）走 .create()，Anthropic-wire 走 .stream()（某些代理只支持流式）
+    use_stream = not settings.is_openai_wire
+
     for attempt in range(1 + retries):
         try:
-            # 使用流式调用 — 某些代理不支持非流式返回 content
-            collected_text = []
-            with client.messages.stream(
-                model=settings.claude_model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_prompt}],
-            ) as stream:
-                for text in stream.text_stream:
-                    collected_text.append(text)
+            if use_stream:
+                collected_text = []
+                with client.messages.stream(
+                    model=settings.claude_model,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": user_prompt}],
+                ) as stream:
+                    for text in stream.text_stream:
+                        collected_text.append(text)
+                result = "".join(collected_text)
+            else:
+                resp = client.messages.create(
+                    model=settings.claude_model,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": user_prompt}],
+                )
+                # _AnthropicLikeResponse: content[0].text
+                result = resp.content[0].text if resp.content else ""
 
-            result = "".join(collected_text)
             if not result.strip():
                 raise AIError(
                     "API 返回了空内容。可能原因：\n"

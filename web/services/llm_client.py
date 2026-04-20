@@ -120,8 +120,24 @@ class _AnthropicLikeResponse:
         self.role = "assistant"
 
 
+class _SimpleUsage:
+    """Responses API usage 对象的简单包装，模拟 OpenAI SDK ChatCompletion.Usage。"""
+    __slots__ = ("prompt_tokens", "completion_tokens", "total_tokens")
+
+    def __init__(self, in_tok: int, out_tok: int):
+        self.prompt_tokens = in_tok
+        self.completion_tokens = out_tok
+        self.total_tokens = in_tok + out_tok
+
+
 class _MessagesProxy:
-    """把 client.messages.create(...) 路由到 OpenAI chat.completions.create(...)。"""
+    """把 client.messages.create(...) 路由到 OpenAI Responses API（/v1/responses）。
+
+    为什么用 Responses API 而非 chat.completions：
+    · gpt-5.4 / gpt-5.2-codex 等 Codex reasoning 模型在 chat.completions 返回 message.content 为空，
+      必须走 /v1/responses 才能拿到 output[].content[].text
+    · Responses API 是 OpenAI 2024 年新接口，更符合 Agent 场景（有 reasoning / tool_use 原生支持）
+    """
     def __init__(self, oa_client, using_shared_pool: bool = False):
         self._oa = oa_client
         self._using_shared_pool = using_shared_pool
@@ -129,45 +145,90 @@ class _MessagesProxy:
     def create(self, *, model: str, messages: list[dict], system: str | None = None,
                max_tokens: int = 1024, temperature: float = 0.7,
                tools: list | None = None, **_kwargs) -> _AnthropicLikeResponse:
-        # 初期阶段：公开池无限量免费使用，不做 session 级额度拦截
-        # （如果将来需要防刷，只需在这里恢复 get_pool_remaining_usd() 检查即可）
-
-        # Anthropic messages → OpenAI messages
-        oa_msgs = []
-        if system:
-            oa_msgs.append({"role": "system", "content": system})
+        # Anthropic messages → Responses input 数组
+        input_array = []
         for m in messages:
             c = m.get("content", "")
             if isinstance(c, list):
-                # content blocks → 拼成纯文本
                 parts = []
                 for b in c:
-                    if isinstance(b, dict):
-                        if b.get("type") == "text" or "text" in b:
-                            parts.append(str(b.get("text", "")))
+                    if isinstance(b, dict) and (b.get("type") == "text" or "text" in b):
+                        parts.append(str(b.get("text", "")))
                 c = "\n".join(parts)
-            oa_msgs.append({"role": m["role"], "content": str(c)})
+            input_array.append({"role": m["role"], "content": str(c)})
 
-        # 调用 OpenAI chat.completions
-        resp = self._oa.chat.completions.create(
-            model=model,
-            messages=oa_msgs,
-            max_tokens=max_tokens,
-            temperature=temperature,
-        )
+        body: dict[str, Any] = {
+            "model": model,
+            "input": input_array,
+            "max_output_tokens": int(max_tokens),
+            "temperature": float(temperature),
+        }
+        if system:
+            body["instructions"] = str(system)
 
-        choice = resp.choices[0] if resp.choices else None
-        text = choice.message.content if choice and choice.message else ""
-        usage = getattr(resp, "usage", None)
+        # 直接用 httpx 调 /v1/responses（OpenAI SDK 各版本 responses 支持不一致，httpx 最稳）
+        import httpx
 
-        # 仅记录累计花费（给设置页显示用量透明用），不做任何拦截
-        if self._using_shared_pool and usage is not None:
-            cost = _estimate_cost_usd(model,
-                                       getattr(usage, "prompt_tokens", 0) or 0,
-                                       getattr(usage, "completion_tokens", 0) or 0)
+        base = str(self._oa.base_url).rstrip("/")
+        api_key = self._oa.api_key
+        url = f"{base}/responses"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        with httpx.Client(timeout=180.0) as http:
+            r = http.post(url, headers=headers, json=body)
+            r.raise_for_status()
+            raw = r.json()
+
+        text = _extract_responses_text(raw)
+        usage_dict = raw.get("usage") or {}
+        in_tok = int(usage_dict.get("input_tokens", 0) or 0)
+        out_tok = int(usage_dict.get("output_tokens", 0) or 0)
+        usage = _SimpleUsage(in_tok, out_tok)
+
+        # 记录累计花费（仅展示用，不拦截）
+        if self._using_shared_pool:
+            cost = _estimate_cost_usd(model, in_tok, out_tok)
             _accumulate_pool_spend(cost)
 
         return _AnthropicLikeResponse(text, usage)
+
+
+def _extract_responses_text(raw: dict) -> str:
+    """从 Responses API 返回的 dict 里抽 assistant 文本。
+
+    示例结构：
+      {
+        "output": [
+          {"type": "message", "role": "assistant", "content": [
+            {"type": "output_text", "text": "..."}
+          ]}
+        ]
+      }
+    """
+    output = raw.get("output") or []
+    texts: list[str] = []
+    for item in output:
+        if not isinstance(item, dict):
+            continue
+        if item.get("type") != "message":
+            continue
+        if item.get("role") and item["role"] != "assistant":
+            continue
+        for c in item.get("content") or []:
+            if not isinstance(c, dict):
+                continue
+            if c.get("type") in ("output_text", "text"):
+                texts.append(str(c.get("text", "")))
+            elif "text" in c:
+                texts.append(str(c.get("text", "")))
+    if texts:
+        return "".join(texts)
+    # fallback：看有没有 output_text 直接字段
+    if isinstance(raw.get("output_text"), str):
+        return raw["output_text"]
+    return ""
 
 
 class OpenAICompatClient:
