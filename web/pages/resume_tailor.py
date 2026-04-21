@@ -38,6 +38,19 @@ if not settings.has_anthropic_key:
     st.stop()
 
 
+def _db_columns(table: str) -> set[str]:
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+        return {r[1] for r in rows}
+    finally:
+        conn.close()
+
+
+def _has_db_column(table: str, column: str) -> bool:
+    return column in _db_columns(table)
+
+
 # ── 读 master ────────────────────────────────────────────
 def load_master() -> dict | None:
     conn = sqlite3.connect(DB_PATH)
@@ -240,6 +253,35 @@ def _pop_undo() -> str | None:
     snap = st.session_state.tailor_undo_stack.pop()
     st.session_state.tailor_data = snap["data"]
     return snap.get("label") or "上一步"
+
+
+def _chat_transcript_payload() -> str:
+    chat = st.session_state.get("tailor_chat") or {"messages": [], "pending": None}
+    payload = {
+        "messages": chat.get("messages", []),
+        "pending": None,
+    }
+    return json.dumps(payload, ensure_ascii=False)
+
+
+def _restore_chat_transcript(raw: str | None) -> None:
+    if not raw:
+        st.session_state.tailor_chat = {"messages": [], "pending": None}
+        return
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        st.session_state.tailor_chat = {"messages": [], "pending": None}
+        return
+    if isinstance(parsed, list):
+        st.session_state.tailor_chat = {"messages": parsed, "pending": None}
+    elif isinstance(parsed, dict):
+        st.session_state.tailor_chat = {
+            "messages": parsed.get("messages", []) or [],
+            "pending": None,
+        }
+    else:
+        st.session_state.tailor_chat = {"messages": [], "pending": None}
 
 
 def _clear_tailor_preview_cache() -> None:
@@ -656,12 +698,18 @@ with col_left:
             ):
                 conn = sqlite3.connect(DB_PATH)
                 conn.row_factory = sqlite3.Row
+                has_chat_col = _has_db_column("resume_versions", "chat_transcript_json")
+                select_cols = "content_json, chat_transcript_json" if has_chat_col else "content_json"
                 row = conn.execute(
-                    "SELECT content_json FROM resume_versions WHERE id = ?",
+                    f"SELECT {select_cols} FROM resume_versions WHERE id = ?",
                     (v["id"],),
                 ).fetchone()
                 conn.close()
                 st.session_state.tailor_data = json.loads(row["content_json"])
+                _restore_chat_transcript(row["chat_transcript_json"] if has_chat_col else None)
+                st.session_state.tailor_undo_stack = []
+                st.session_state.tailor_meta = {}
+                _clear_tailor_preview_cache()
                 st.rerun()
 
 
@@ -1096,18 +1144,33 @@ with tab_preview:
                 alert_warning("请输入版本名")
             else:
                 conn = sqlite3.connect(DB_PATH)
-                conn.execute(
-                    """INSERT INTO resume_versions
-                       (master_id, target_role, version_name, content_json, match_score)
-                       VALUES (?, ?, ?, ?, ?)""",
-                    (
-                        master["id"],
-                        st.session_state.tailor_data["basics"].get("target_role"),
-                        v_name.strip(),
-                        json.dumps(st.session_state.tailor_data, ensure_ascii=False),
-                        st.session_state.tailor_meta.get("match_score", 0),
-                    ),
-                )
+                if _has_db_column("resume_versions", "chat_transcript_json"):
+                    conn.execute(
+                        """INSERT INTO resume_versions
+                           (master_id, target_role, version_name, content_json, match_score, chat_transcript_json)
+                           VALUES (?, ?, ?, ?, ?, ?)""",
+                        (
+                            master["id"],
+                            st.session_state.tailor_data["basics"].get("target_role"),
+                            v_name.strip(),
+                            json.dumps(st.session_state.tailor_data, ensure_ascii=False),
+                            st.session_state.tailor_meta.get("match_score", 0),
+                            _chat_transcript_payload(),
+                        ),
+                    )
+                else:
+                    conn.execute(
+                        """INSERT INTO resume_versions
+                           (master_id, target_role, version_name, content_json, match_score)
+                           VALUES (?, ?, ?, ?, ?)""",
+                        (
+                            master["id"],
+                            st.session_state.tailor_data["basics"].get("target_role"),
+                            v_name.strip(),
+                            json.dumps(st.session_state.tailor_data, ensure_ascii=False),
+                            st.session_state.tailor_meta.get("match_score", 0),
+                        ),
+                    )
                 conn.commit()
                 conn.close()
                 alert_success(f"已保存：{v_name}")
