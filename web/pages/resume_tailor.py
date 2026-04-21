@@ -242,6 +242,42 @@ def _pop_undo() -> str | None:
     return snap.get("label") or "上一步"
 
 
+def _clear_tailor_preview_cache() -> None:
+    st.session_state.pop("_tailor_preview_key", None)
+    st.session_state.pop("_tailor_preview_pdf", None)
+
+
+def _sync_bound_widget(key: str, current_value: object) -> str:
+    current = "" if current_value is None else str(current_value)
+    source_key = f"_tailor_widget_source::{key}"
+    previous_source = st.session_state.get(source_key)
+    widget_value = st.session_state.get(key)
+
+    if key not in st.session_state:
+        st.session_state[key] = current
+    elif previous_source != current and widget_value == previous_source:
+        st.session_state[key] = current
+    return current
+
+
+def _bound_text_input(label: str, current_value: object, key: str, **kwargs) -> str:
+    current = _sync_bound_widget(key, current_value)
+    value = st.text_input(label, key=key, **kwargs)
+    if value != current:
+        _clear_tailor_preview_cache()
+    st.session_state[f"_tailor_widget_source::{key}"] = value
+    return value
+
+
+def _bound_text_area(label: str, current_value: object, key: str, **kwargs) -> str:
+    current = _sync_bound_widget(key, current_value)
+    value = st.text_area(label, key=key, **kwargs)
+    if value != current:
+        _clear_tailor_preview_cache()
+    st.session_state[f"_tailor_widget_source::{key}"] = value
+    return value
+
+
 # ── Chat 面板（Phase 1 · 全宽折叠区，置于三栏之上）────────
 from services import resume_chat as _resume_chat_service  # noqa: E402
 
@@ -635,16 +671,36 @@ def _render_manual_editor() -> None:
         )
 
     with st.expander("基本信息", expanded=False):
-        data["basics"]["target_role"] = st.text_input(
-            "求职意向", value=data["basics"].get("target_role", "")
-        )
-        data["basics"]["city"] = st.text_input(
-            "期望城市", value=data["basics"].get("city", "")
-        )
+        basics = data.setdefault("basics", {})
+        c1, c2 = st.columns(2)
+        with c1:
+            basics["name"] = _bound_text_input(
+                "姓名", basics.get("name", ""), "tailor_basics_name"
+            )
+            basics["email"] = _bound_text_input(
+                "邮箱", basics.get("email", ""), "tailor_basics_email"
+            )
+            basics["target_role"] = _bound_text_input(
+                "求职意向", basics.get("target_role", ""), "tailor_basics_target_role"
+            )
+        with c2:
+            basics["phone"] = _bound_text_input(
+                "电话", basics.get("phone", ""), "tailor_basics_phone"
+            )
+            basics["city"] = _bound_text_input(
+                "期望城市", basics.get("city", ""), "tailor_basics_city"
+            )
+            basics["availability"] = _bound_text_input(
+                "到岗时间", basics.get("availability", ""), "tailor_basics_availability"
+            )
+        basics["photo"] = basics.get("photo", "")
 
     with st.expander("个人总结", expanded=True):
-        data["profile"] = st.text_area(
-            "profile", value=data["profile"], height=120,
+        data["profile"] = _bound_text_area(
+            "profile",
+            data.get("profile", ""),
+            "tailor_profile",
+            height=120,
             label_visibility="collapsed",
         )
         if st.button("仅重写此段", key="rw_profile"):
@@ -666,12 +722,12 @@ def _render_manual_editor() -> None:
     with st.expander("项目经历", expanded=False):
         for p_idx, p in enumerate(data["projects"]):
             st.markdown(f"**{p['company']}** — {p['date']}")
-            p["role"] = st.text_input(
-                "职位", value=p["role"], key=f"proj_role_{p_idx}"
+            p["role"] = _bound_text_input(
+                "职位", p.get("role", ""), f"proj_role_{p_idx}"
             )
             for b_idx, b in enumerate(p["bullets"]):
-                p["bullets"][b_idx] = st.text_area(
-                    f"bullet {b_idx + 1}", value=b,
+                p["bullets"][b_idx] = _bound_text_area(
+                    f"bullet {b_idx + 1}", b,
                     key=f"proj_{p_idx}_b_{b_idx}", height=68,
                     label_visibility="collapsed",
                 )
@@ -679,12 +735,12 @@ def _render_manual_editor() -> None:
     with st.expander("实习经历", expanded=False):
         for i_idx, i in enumerate(data["internships"]):
             st.markdown(f"**{i['company']}** — {i['date']}")
-            i["role"] = st.text_input(
-                "职位", value=i["role"], key=f"intern_role_{i_idx}"
+            i["role"] = _bound_text_input(
+                "职位", i.get("role", ""), f"intern_role_{i_idx}"
             )
             for b_idx, b in enumerate(i["bullets"]):
-                i["bullets"][b_idx] = st.text_area(
-                    f"bullet {b_idx + 1}", value=b,
+                i["bullets"][b_idx] = _bound_text_area(
+                    f"bullet {b_idx + 1}", b,
                     key=f"intern_{i_idx}_b_{b_idx}", height=68,
                     label_visibility="collapsed",
                 )
@@ -693,13 +749,13 @@ def _render_manual_editor() -> None:
         for s_idx, s in enumerate(data["skills"]):
             cols = st.columns([1, 4])
             with cols[0]:
-                s["label"] = st.text_input(
-                    "标签", value=s["label"], key=f"skill_l_{s_idx}",
+                s["label"] = _bound_text_input(
+                    "标签", s.get("label", ""), f"skill_l_{s_idx}",
                     label_visibility="collapsed",
                 )
             with cols[1]:
-                s["text"] = st.text_input(
-                    "内容", value=s["text"], key=f"skill_t_{s_idx}",
+                s["text"] = _bound_text_input(
+                    "内容", s.get("text", ""), f"skill_t_{s_idx}",
                     label_visibility="collapsed",
                 )
 
@@ -1050,5 +1106,4 @@ with tab_preview:
                 conn.close()
                 alert_success(f"已保存：{v_name}")
                 st.rerun()
-
 
