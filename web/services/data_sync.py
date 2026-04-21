@@ -63,7 +63,7 @@ def export_all_data(db_path: Path, user_profile: dict | None = None) -> dict:
 
     # 获取所有现有表
     existing = {r[0] for r in conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_%'"
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
     ).fetchall()}
 
     for tbl in EXPORTABLE_TABLES:
