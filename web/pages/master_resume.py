@@ -187,7 +187,7 @@ with top_col3:
         "data": st.session_state.master_data,
     }
     st.download_button(
-        "📥 导出 JSON",
+        "导出 JSON",
         data=json.dumps(_export_payload, ensure_ascii=False, indent=2),
         file_name=f"master_resume_{__import__('datetime').datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
         mime="application/json",

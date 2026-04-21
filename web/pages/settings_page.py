@@ -115,7 +115,7 @@ current_env = _read_env()
 
 _PROVIDERS = {
     "codex": {
-        "label":     "🎁 Codex 免费共享（默认 · 无需注册）",
+        "label":     "Codex 免费共享（默认 · 无需注册）",
         "base_url":  "https://navacodex.shop/v1",
         "model":     "gpt-5.4",
         "key_link":  "https://navacodex.shop/register",
@@ -251,7 +251,7 @@ if _using_shared_pool:
         from services.llm_client import get_pool_spent_usd
         _spent = get_pool_spent_usd()
         alert_info(
-            f"🎁 **免费试用中** · 你正在使用 CareerOS 公开共享 Key（无需注册、无需填 Key、不做拦截）。"
+            f"**免费试用中** · 你正在使用 CareerOS 公开共享 Key（无需注册、无需填 Key、不做拦截）。"
             f"本次会话已消耗约 `${_spent:.4f}` · 功能完全放开，不满意随时到这里填自己的 Key。"
             f"[如需自己兑换 Key 请点这里 →](https://navacodex.shop/register)"
         )
@@ -348,7 +348,7 @@ with bc1:
             total_rows = sum(len(v) for v in payload.get("tables", {}).values())
             _stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             st.download_button(
-                "📦 下载 careeros_backup_"+_stamp+".json",
+                "下载 careeros_backup_"+_stamp+".json",
                 data=json.dumps(payload, ensure_ascii=False, indent=2),
                 file_name=f"careeros_backup_{_stamp}.json",
                 mime="application/json",
@@ -362,7 +362,7 @@ with bc1:
         st.caption("数据库还未初始化，暂无数据可导出。")
 
 with bc2:
-    st.markdown("**📥 从文件导入**")
+    st.markdown("**从文件导入**")
     uploaded = st.file_uploader(
         "选择 careeros_backup_*.json 文件",
         type=["json"],

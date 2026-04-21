@@ -103,7 +103,7 @@ def extract_text(uploaded_file) -> str:
 page_header("添加 JD", subtitle="加一个新岗位到你的视野里")
 
 tab_search, tab_url, tab_smart_paste, tab_paste, tab_upload = st.tabs([
-    "🔍 关键词搜索（推荐）", "链接抓取", "智能粘贴", "手动粘贴", "上传文件",
+    "关键词搜索（推荐）", "链接抓取", "智能粘贴", "手动粘贴", "上传文件",
 ])
 
 # ── 关键词搜索 → 自动入库 ─────────────────────────────────
@@ -138,7 +138,7 @@ with tab_search:
         adv_p0 = st.text_area("P0 公司白名单（每行一个）", value=_p0_default, height=80, key="search_p0")
         adv_ex = st.text_area("排除公司（每行一个）", value=_ex_default, height=80, key="search_excluded")
 
-    if st.button("🔍 开始搜索", type="primary", key="do_keyword_search",
+    if st.button("开始搜索", type="primary", key="do_keyword_search",
                  disabled=not _settings_search.has_anthropic_key):
         kws = [k.strip() for k in search_kw_str.split(",") if k.strip()]
         if not kws:
@@ -175,7 +175,7 @@ with tab_search:
 
         ins_col, clr_col = st.columns([2, 1])
         with ins_col:
-            if st.button(f"📥 把这 {len(_results)} 条入库到岗位池", type="primary", key="bulk_insert_jobs"):
+            if st.button(f"把这 {len(_results)} 条入库到岗位池", type="primary", key="bulk_insert_jobs"):
                 try:
                     from services.job_search import insert_jobs_to_pool
                     stats = insert_jobs_to_pool(_settings_search.db_full_path, _results)

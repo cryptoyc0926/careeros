@@ -532,7 +532,7 @@ with tab_preview:
     else:
         st.caption("（没上传过原 PDF · 去「主简历 → 上传文件」上传后，这里可以看到原件对照）")
 
-    st.markdown("##### 🎨 系统生成的新 PDF（基于模板）")
+    st.markdown("##### 系统生成的新 PDF（基于模板）")
 
     try:
         pdf_bytes = resume_renderer.render_pdf_bytes(st.session_state.tailor_data)
