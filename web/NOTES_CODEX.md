@@ -19,3 +19,9 @@
 2026-04-21 | fix | web/pages/resume_tailor.py | 为公开 Demo 增加占位符主简历兜底，避免在线编辑核心页出现 **** 占位标题
 2026-04-21 | fix | web/pages/resume_tailor.py, web/services/resume_renderer.py | PDF 预览增加 PyMuPDF/pdf2image/iframe 三级降级，避免云端缺少 pdftoppm 时预览失败
 2026-04-21 | fix | web/app.py | 清理 CSS 注释中的红线关键词，避免内联事件 grep 误报
+2026-04-21 | feat(Claude) | web/services/resume_patch.py, web/services/resume_chat.py, web/pages/resume_tailor.py, requirements.txt | Chat 定制 Phase 1：JSON patch 引擎 + chat 服务(full_rewrite+advice_only) + 页面顶部对话面板 + undo 栈(10层) + PyMuPDF 依赖固化
+2026-04-21 | test | web/tests/test_resume_parser.py | 加完整简历 fixture（FIXTURE_C_FULL_UPLOAD），覆盖 profile/2 项目/2 实习/技能/教育全字段校验
+2026-04-21 | fix | web/services/resume_rule_parser.py | OCR 空白归一化 + inline 章节标题拆分 + 单月日期和全角破折号 + `·` 分隔 + 学校/专业 inline 拆分，修复完整简历解析丢章节
+2026-04-21 | fix | web/pages/master_resume.py | 上传后自动跑规则解析 + 清 tailor_data/meta/jd/preview 缓存，避免在线定制继续用旧数据
+2026-04-21 | fix | web/pages/resume_tailor.py | load_master 带 updated_at + master_signature 变化即重载 tailor_data；st.image 改 width=650 兼容旧 Streamlit
+2026-04-21 | docs | web/services/resume_prompt_rules.py, CHANGELOG.md, web/prompts/resume_writing_rules.md | 规则四件套 v2.3：新增 resume_writing_rules.md（STAR/6 步法/5 槽位/动词偏好/数字规则），只同步版本号文档，未改规则常量
