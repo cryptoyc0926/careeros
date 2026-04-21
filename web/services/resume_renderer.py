@@ -137,6 +137,49 @@ def render_pdf_bytes(data: dict[str, Any], template_name: str = DEFAULT_TEMPLATE
     return HTML(string=html_str, base_url=str(TEMPLATE_DIR)).write_pdf()
 
 
+def render_preview_png(
+    data: dict[str, Any],
+    template_name: str = DEFAULT_TEMPLATE,
+    dpi: int = 110,
+) -> tuple[bytes | None, str]:
+    """
+    生成简历第一页 PNG 预览。三级降级：
+      1. PyMuPDF (fitz)  — 纯 Python wheel，无系统依赖，首选
+      2. pdf2image      — 需要 poppler/pdftoppm，作为次选
+      3. 失败            — 返回 (None, "iframe")，调用方自行展示 PDF iframe
+
+    返回：(png_bytes, backend_name)。backend 可选值：pymupdf / pdf2image / iframe。
+    失败时 png_bytes 为 None，调用方应降级展示 PDF。
+    """
+    pdf_bytes = render_pdf_bytes(data, template_name=template_name)
+
+    # 方案 1：PyMuPDF（首选）
+    try:
+        import fitz  # type: ignore
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        if doc.page_count > 0:
+            zoom = dpi / 72.0
+            pix = doc[0].get_pixmap(matrix=fitz.Matrix(zoom, zoom))
+            return pix.tobytes("png"), "pymupdf"
+    except Exception:
+        pass
+
+    # 方案 2：pdf2image（需 poppler）
+    try:
+        from pdf2image import convert_from_bytes  # type: ignore
+        import io as _io
+        images = convert_from_bytes(pdf_bytes, dpi=dpi, first_page=1, last_page=1)
+        if images:
+            buf = _io.BytesIO()
+            images[0].save(buf, format="PNG")
+            return buf.getvalue(), "pdf2image"
+    except Exception:
+        pass
+
+    # 方案 3：降级，交给调用方
+    return None, "iframe"
+
+
 def load_json(path: Path | str) -> dict[str, Any]:
     return json.loads(Path(path).read_text(encoding="utf-8"))
 

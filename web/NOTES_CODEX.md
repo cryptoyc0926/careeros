@@ -16,3 +16,5 @@
 2026-04-21 | feat(Claude) | web/services/job_filter.py, scripts/clean_excluded_companies.py | audit #6 排除公司（字节/腾讯/蚂蚁/网易）过滤器+一次性清洗脚本
 2026-04-21 | fix(Claude) | web/pages/{jd_browser,pipeline,job_pool,jd_input}.py | audit #6 展示层 + 导入层套用 job_filter，清洗脚本删除 jobs_pool 9 条 / job_descriptions 2 条
 2026-04-21 | fix | web/app.py, web/pages/settings_page.py | 修正公开 Demo 的 Provider 文案、默认选择和云端路径展示，避免误导用户填写 Claude Key 或暴露绝对路径
+2026-04-21 | fix | web/pages/resume_tailor.py | 为公开 Demo 增加占位符主简历兜底，避免在线编辑核心页出现 **** 占位标题
+2026-04-21 | fix | web/pages/resume_tailor.py, web/services/resume_renderer.py | PDF 预览增加 PyMuPDF/pdf2image/iframe 三级降级，避免云端缺少 pdftoppm 时预览失败

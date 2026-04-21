@@ -53,6 +53,109 @@ def load_master() -> dict | None:
     }
 
 
+def demo_master_fallback() -> dict:
+    """公开 Demo 的兜底主简历：只在云端样例数据为空/占位符时使用。"""
+    return {
+        "id": 0,
+        "basics": {
+            "name": "杨 超",
+            "phone": "186-8795-0926",
+            "email": "bc1chao0926@gmail.com",
+            "target_role": "AI 增长运营",
+            "city": "杭州",
+            "availability": "下周到岗",
+            "photo": "",
+        },
+        "profile": {
+            "pool": [
+                {
+                    "id": "growth_ai",
+                    "tags": ["增长", "AI", "运营"],
+                    "text": (
+                        "统计科班出身，擅长把数据变成增长动作。曾从 0 搭建 AI Trading 社区，"
+                        "实现 9,000+ X 粉丝与 1,300+ Telegram 订阅，完成 20+ 次商业合作；"
+                        "3 段运营实习覆盖增长、内容与数据分析。"
+                    ),
+                }
+            ],
+            "default": "growth_ai",
+        },
+        "projects": [
+            {
+                "company": "AI Trading 社区搭建",
+                "role": "用户增长运营",
+                "date": "2024.03 - 至今",
+                "bullets": [
+                    "从 0 搭建 X 与 Telegram 内容矩阵，在零投放预算下增长至 9,000+ 粉丝与 1,300+ 订阅。",
+                    "设计热点监测、信号筛选、结构化分析、分发输出流程，稳定支撑每周 15+ 条内容产出。",
+                    "围绕用户关注点做内容测试与社群运营，沉淀可复用的 AI 内容生产 SOP。",
+                ],
+            },
+            {
+                "company": "CareerOS 求职系统",
+                "role": "产品与自动化实践",
+                "date": "2025.10 - 至今",
+                "bullets": [
+                    "搭建岗位池、JD 解析、简历定制、投递看板与面试准备工作流，覆盖求职全链路。",
+                    "用 SQLite 管理岗位与投递数据，结合大模型完成 JD 匹配、简历改写与评估。",
+                ],
+            },
+        ],
+        "internships": [
+            {
+                "company": "Fancy Tech",
+                "role": "海外产品运营实习生",
+                "date": "2024.06 - 2024.09",
+                "bullets": [
+                    "搭建 TikTok/Instagram 内容矩阵，建立 AI 内容生产、自动化编辑、多平台分发 SOP。",
+                    "拆解 PhotoRoom、Pebblely 等竞品链路，提炼高转化场景并输出产品优化建议。",
+                ],
+            },
+            {
+                "company": "杭银消费金融股份有限公司",
+                "role": "数据运营实习生",
+                "date": "2023.06 - 2023.10",
+                "bullets": [
+                    "参与用户分层、活动复盘与指标看板维护，支持运营策略迭代。",
+                    "整理业务数据与活动结果，输出周报和专项分析材料。",
+                ],
+            },
+        ],
+        "skills": [
+            {"label": "数据分析", "text": "Python / SQL / Excel / 指标拆解 / A/B 测试"},
+            {"label": "增长运营", "text": "内容矩阵搭建 / 社群运营 / 用户转化 / SOP 沉淀"},
+            {"label": "AI 工具", "text": "Prompt Engineering / 自动化工作流 / LLM 应用原型"},
+        ],
+        "education": [
+            {
+                "school": "云南财经大学",
+                "major": "统计学",
+                "date": "2022.09 - 2026.07",
+                "bullets": ["核心课程：统计学、计量经济学、Python 数据分析、数据库原理。"],
+            }
+        ],
+    }
+
+
+def master_needs_demo_fallback(master: dict) -> bool:
+    def _bad_text(value: object) -> bool:
+        text = str(value or "").strip()
+        compact = text.replace("*", "").replace("-", "").replace("—", "").strip()
+        return not compact or text.startswith("****")
+
+    basics = master.get("basics", {})
+    if _bad_text(basics.get("name")) or str(basics.get("name", "")).startswith("你的"):
+        return True
+    for section in ("projects", "internships"):
+        items = master.get(section) or []
+        if not items:
+            return True
+        for item in items:
+            if _bad_text(item.get("company")) or _bad_text(item.get("role")):
+                return True
+    return False
+
+
 def flatten_master_for_render(master: dict) -> dict:
     """把 profile pool 折叠成默认文本，得到 renderer 直接可用的扁平结构。"""
     profile = master["profile"]
@@ -78,10 +181,17 @@ master = load_master()
 if not master:
     alert_info("主简历还没创建。请先到左侧「**主简历**」页面填写基本信息和经历，再回来使用定制功能。")
     st.stop()
+demo_fallback_active = False
+if settings.demo_mode and master_needs_demo_fallback(master):
+    master = demo_master_fallback()
+    demo_fallback_active = True
 
 
 # ── Session state ────────────────────────────────────────
-if "tailor_data" not in st.session_state:
+if (
+    "tailor_data" not in st.session_state
+    or (demo_fallback_active and master_needs_demo_fallback(st.session_state.tailor_data))
+):
     st.session_state.tailor_data = flatten_master_for_render(master)
 if "tailor_meta" not in st.session_state:
     st.session_state.tailor_meta = {}
@@ -554,29 +664,28 @@ with tab_preview:
     if pdf_bytes is None:
         st.caption("点击「生成预览」后才会生成 PDF，避免每次打开页面都触发渲染。")
     else:
-        # 转 PNG 预览
-        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tf:
-            tf.write(pdf_bytes)
-            tmp_pdf = Path(tf.name)
-
+        # 三级降级预览：PyMuPDF → pdf2image → iframe
+        png_bytes = None
         try:
-            from pdf2image import convert_from_path
-            images = convert_from_path(str(tmp_pdf), dpi=110, first_page=1, last_page=1)
-            if images:
-                st.image(images[0], use_column_width=True)
-        except Exception:
-            # pdf2image 不可用则用 pdftoppm 回退
-            import subprocess
-            png_prefix = tmp_pdf.with_suffix("")
-            subprocess.run(
-                ["pdftoppm", "-png", "-r", "110", str(tmp_pdf), str(png_prefix)],
-                check=False,
+            png_bytes, _backend = resume_renderer.render_preview_png(
+                st.session_state.tailor_data
             )
-            png_file = Path(str(png_prefix) + "-1.png")
-            if png_file.exists():
-                st.image(str(png_file), use_column_width=True)
-            else:
-                st.caption("（预览不可用，请直接下载 PDF 查看）")
+        except Exception as _e:
+            png_bytes = None
+
+        if png_bytes:
+            st.image(png_bytes, use_container_width=True)
+        else:
+            # 最终降级：直接嵌 PDF iframe
+            import base64 as _b64p
+            _b64_pdf = _b64p.b64encode(pdf_bytes).decode()
+            st.markdown(
+                f'<iframe src="data:application/pdf;base64,{_b64_pdf}" '
+                f'width="100%" height="640px" '
+                f'style="border:1px solid rgba(29,29,31,0.08);border-radius:14px"></iframe>',
+                unsafe_allow_html=True,
+            )
+            st.caption("（PNG 预览依赖不可用，已改为浏览器内嵌 PDF 视图）")
 
         st.download_button(
             "下载 PDF",
