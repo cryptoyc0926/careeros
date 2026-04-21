@@ -27,10 +27,12 @@ _PHONE_RE = re.compile(
 )
 _EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
 _DATE_RANGE_RE = re.compile(
-    r"(\d{4}[.\-/年]\s*\d{1,2}(?:[.\-/月]\s*\d{0,2})?)"
+    r"(\d{4}\s*[.\-/年]\s*\d{1,2}(?:\s*[.\-/月]\s*\d{0,2})?)"
     r"\s*[-~至到—–]+\s*"
-    r"(\d{4}[.\-/年]\s*\d{1,2}(?:[.\-/月]\s*\d{0,2})?|至今|今|现在|present|now)"
+    r"(\d{4}\s*[.\-/年]\s*\d{1,2}(?:\s*[.\-/月]\s*\d{0,2})?|至今|今|现在|present|now)",
+    re.IGNORECASE,
 )
+_SINGLE_DATE_RE = re.compile(r"\d{4}\s*[.\-/年]\s*\d{1,2}(?:\s*[.\-/月]\s*\d{0,2})?")
 _NAME_CN_RE = re.compile(r"^[\u4e00-\u9fa5]{2,4}$")
 
 # Bullet 开头的装饰符：• ● ※ ▪ ▫ ◦ ○ ◆ ◇ ■ □ · ・ ⭐ ► ▶ ◆
@@ -44,6 +46,7 @@ _ROLE_KEYWORDS = [
     # 中文完整职位
     "用户增长运营", "增长运营", "内容运营", "社区运营", "海外运营", "社媒运营",
     "产品运营", "活动运营", "数据运营", "营销运营", "品牌运营",
+    "独立运营", "AI 方向内容账号", "求职全流程 AI 工具", "vibe coding 作品",
     "运营实习生", "产品实习生", "设计实习生", "技术实习生", "开发实习生",
     "产品经理", "产品助理", "产品设计", "交互设计", "UI 设计师", "UX 设计师",
     "算法工程师", "前端工程师", "后端工程师", "测试工程师", "全栈工程师",
@@ -148,7 +151,7 @@ _MAX_HEADING_LEN = 20
 
 def parse_resume_text(text: str) -> dict:
     """把简历文本解析为 resume_master schema。"""
-    text = text.replace("\u00a0", " ").replace("\r\n", "\n").replace("\r", "\n")
+    text = _normalize_text(text)
 
     basics = _extract_basics(text)
     sections = _split_sections(text)
@@ -225,7 +228,7 @@ def _find_field(text: str, label_pattern: str) -> str:
 
 def _split_sections(text: str) -> dict[str, list[str]]:
     """按章节锚点切分。"""
-    lines = text.split("\n")
+    lines = _explode_inline_section_headings(text.split("\n"))
     section_ranges: list[tuple[int, str]] = []
     for i, ln in enumerate(lines):
         cleaned = ln.strip()
@@ -257,6 +260,46 @@ def _split_sections(text: str) -> dict[str, list[str]]:
         result.setdefault(key, []).extend(content)
 
     return result
+
+
+def _normalize_text(text: str) -> str:
+    """清理 PDF/DOCX 提取常见空白，尽量保留原文行结构。"""
+    text = text.replace("\u00a0", " ").replace("\u3000", " ")
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    return "\n".join(re.sub(r"[ \t]+", " ", ln).strip() for ln in text.split("\n"))
+
+
+def _explode_inline_section_headings(lines: list[str]) -> list[str]:
+    """把“个人总结 xxxxx”这类标题同行内容拆开，避免章节丢失。"""
+    heading_words = [kw for kws in SECTIONS.values() for kw in kws]
+    heading_words.sort(key=len, reverse=True)
+    heading_re = re.compile(r"^(" + "|".join(re.escape(x) for x in heading_words) + r")(?=\s|[:：]|$)", re.IGNORECASE)
+
+    out: list[str] = []
+    for raw in lines:
+        line = raw.strip()
+        if not line:
+            continue
+        m = heading_re.match(line)
+        if m and len(line) > len(m.group(1)):
+            out.append(m.group(1))
+            rest = line[m.end():].strip(" :：-—–")
+            if rest:
+                out.append(rest)
+        else:
+            out.append(line)
+    return out
+
+
+def _split_school_major_inline(text: str) -> tuple[str, str]:
+    """从“浙江工商大学 应用统计学 · 本科”拆出学校和专业。"""
+    for kw in _SCHOOL_KEYWORDS:
+        idx = text.lower().find(kw.lower())
+        if idx >= 0:
+            school = text[: idx + len(kw)].strip()
+            major = text[idx + len(kw):].strip(" ·,，、:：-—–")
+            return school, major
+    return text, ""
 
 
 def _join_section(lines: list[str]) -> str:
@@ -306,11 +349,19 @@ def _parse_items(lines: list[str]) -> list[dict]:
 
         # --- header 检测 ---
         date_match = _DATE_RANGE_RE.search(ln)
+        if not date_match:
+            single = _SINGLE_DATE_RE.search(ln)
+            if single and not (_is_bullet_start(ln) or _NUM_BULLET_RE.match(ln)):
+                # 项目经历常见“2026.04”单点时间；要求日期前仍有足够 header 文本，避免误把 bullet 数字当 header。
+                head = _SINGLE_DATE_RE.sub("", ln).strip(" |,，、:：-·—–").strip()
+                if len(head) >= 4:
+                    date_match = single
         if date_match:
             if current is not None:
                 items.append(current)
             date_str = date_match.group(0).strip()
-            header_text = _DATE_RANGE_RE.sub("", ln).strip(" |,，、:：-·—–").strip()
+            header_text = ln[:date_match.start()] + ln[date_match.end():]
+            header_text = header_text.strip(" |,，、:：-·—–").strip()
             company, role = _split_company_role(header_text)
             current = {
                 "company": company,
@@ -376,7 +427,11 @@ def _split_company_role(text: str) -> tuple[str, str]:
         if sep in text:
             parts = [p.strip() for p in text.split(sep, 1) if p.strip()]
             if len(parts) == 2 and parts[0] and parts[1]:
-                return parts[0], parts[1]
+                left, right = parts
+                left_company, left_role = _split_company_role_no_mid_sep(left)
+                if left_company and left_role:
+                    return left_company, f"{left_role} · {right}"
+                return left, right
 
     # 2. 找 role 关键词 + company 关键词位置
     role_hits = _find_kw_hits(text, _ROLE_KEYWORDS)
@@ -452,6 +507,21 @@ def _split_company_role(text: str) -> tuple[str, str]:
 
     # 5. 兜底：整段当 company
     return text.strip(), ""
+
+
+def _split_company_role_no_mid_sep(text: str) -> tuple[str, str]:
+    """只用关键词在单段内拆 company/role，避免递归处理中点分隔符。"""
+    role_hits = _find_kw_hits(text, _ROLE_KEYWORDS)
+    role_hits.sort(key=lambda h: (h[0], -(h[1] - h[0])))
+    if not role_hits:
+        return text.strip(), ""
+
+    role_start = role_hits[0][0]
+    if role_start <= 0:
+        return "", text.strip()
+    company = text[:role_start].strip(" ,，、:：-·—–")
+    role = text[role_start:].strip(" ,，、:：-·—–")
+    return company, role
 
 
 def _normalize_date(date_str: str) -> str:
@@ -545,9 +615,18 @@ def _parse_education(lines: list[str]) -> list[dict]:
                 else:
                     parts = [single]
 
-            # school/major 启发式：谁含"大学/学院/学校"谁是 school
-            school, major = _pick_school_major(parts[:2]) if len(parts) >= 2 else (parts[0] if parts else "", "")
-            bullets_tail = parts[2:]
+            # school/major 启发式：谁含"大学/学院/学校"谁是 school；同段里也能拆专业。
+            if parts:
+                inline_school, inline_major = _split_school_major_inline(parts[0])
+            else:
+                inline_school, inline_major = "", ""
+
+            if inline_school and inline_major:
+                school, major = inline_school, inline_major
+                bullets_tail = parts[1:]
+            else:
+                school, major = _pick_school_major(parts[:2]) if len(parts) >= 2 else (parts[0] if parts else "", "")
+                bullets_tail = parts[2:]
 
             current = {
                 "school": school,
