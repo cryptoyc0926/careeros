@@ -277,6 +277,12 @@ class Settings:
             return True
         return False
 
+    @property
+    def enable_chat_tailor(self) -> bool:
+        """ENABLE_CHAT_TAILOR=false 时隐藏简历定制页的 AI Chat 面板。"""
+        raw = os.getenv("ENABLE_CHAT_TAILOR", "true").strip().lower()
+        return raw not in ("0", "false", "no", "off")
+
 
 @lru_cache
 def get_settings() -> Settings:

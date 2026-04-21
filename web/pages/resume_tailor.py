@@ -12,8 +12,10 @@
 
 from __future__ import annotations
 
-import json
 import hashlib
+import difflib
+import html
+import json
 import sqlite3
 from pathlib import Path
 
@@ -222,6 +224,9 @@ if (
     st.session_state.tailor_jd = ""
     st.session_state["_tailor_preview_key"] = None
     st.session_state["_tailor_preview_pdf"] = None
+    st.session_state["_tailor_preview_png"] = None
+    st.session_state["_tailor_preview_backend"] = None
+    st.session_state["_tailor_preview_error"] = None
     st.session_state["_tailor_master_signature"] = master_signature
 if "tailor_meta" not in st.session_state:
     st.session_state.tailor_meta = {}
@@ -231,6 +236,8 @@ if "tailor_chat" not in st.session_state:
     st.session_state.tailor_chat = {"messages": [], "pending": None}
 if "tailor_undo_stack" not in st.session_state:
     st.session_state.tailor_undo_stack = []
+
+ENABLE_CHAT_TAILOR = settings.enable_chat_tailor
 
 
 # ── 撤销栈工具 ────────────────────────────────────────────
@@ -287,6 +294,9 @@ def _restore_chat_transcript(raw: str | None) -> None:
 def _clear_tailor_preview_cache() -> None:
     st.session_state.pop("_tailor_preview_key", None)
     st.session_state.pop("_tailor_preview_pdf", None)
+    st.session_state.pop("_tailor_preview_png", None)
+    st.session_state.pop("_tailor_preview_backend", None)
+    st.session_state.pop("_tailor_preview_error", None)
 
 
 def _sync_bound_widget(key: str, current_value: object) -> str:
@@ -327,7 +337,43 @@ from services import resume_patch as _resume_patch_mod  # noqa: E402
 
 
 def _render_patch_diff(patch: list[dict], tailor_data: dict) -> None:
-    """把 pending_patch 渲染成 old/new 对比。"""
+    """把 pending_patch 渲染成字符级 old/new 对比。"""
+    st.markdown(
+        """
+        <style>
+        .cos-diff-box{border:1px solid rgba(29,29,31,0.08);border-radius:10px;
+          background:#ffffff;margin:8px 0 14px 0;overflow:hidden;}
+        .cos-diff-path{padding:8px 12px;background:#f5f5f7;color:#6e6e73;
+          font-size:12px;border-bottom:1px solid rgba(29,29,31,0.06);}
+        .cos-diff-line{display:flex;gap:10px;padding:10px 12px;white-space:pre-wrap;
+          line-height:1.55;font-family:"SF Mono",ui-monospace,Menlo,monospace;
+          font-size:13px;color:#1d1d1f;}
+        .cos-diff-line + .cos-diff-line{border-top:1px solid rgba(29,29,31,0.06);}
+        .cos-diff-prefix{width:16px;flex:0 0 16px;font-weight:700;}
+        .cos-diff-minus{color:#c42323;}
+        .cos-diff-plus{color:#18794e;}
+        .cos-diff-del{background:#ffe8e8;color:#9f1c1c;text-decoration:line-through;}
+        .cos-diff-add{background:#dcfce7;color:#11643a;}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    def _char_diff_html(old_text: str, new_text: str) -> tuple[str, str]:
+        old_parts: list[str] = []
+        new_parts: list[str] = []
+        for token in difflib.ndiff(list(old_text), list(new_text)):
+            tag = token[:1]
+            char = html.escape(token[2:])
+            if tag == " ":
+                old_parts.append(char)
+                new_parts.append(char)
+            elif tag == "-":
+                old_parts.append(f'<span class="cos-diff-del">{char}</span>')
+            elif tag == "+":
+                new_parts.append(f'<span class="cos-diff-add">{char}</span>')
+        return "".join(old_parts), "".join(new_parts)
+
     for i, p in enumerate(patch):
         path = p.get("path", "")
         new_val = p.get("value", "")
@@ -335,14 +381,17 @@ def _render_patch_diff(patch: list[dict], tailor_data: dict) -> None:
             old_val = _resume_patch_mod.get_by_path(tailor_data, path)
         except Exception:
             old_val = "(不存在)"
-        st.caption(f"#{i+1} · `{path}`")
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown("**原文**")
-            st.code(str(old_val), language="text")
-        with c2:
-            st.markdown("**新版**")
-            st.code(str(new_val), language="text")
+        old_html, new_html = _char_diff_html(str(old_val), str(new_val))
+        st.markdown(
+            f'''
+            <div class="cos-diff-box">
+              <div class="cos-diff-path">#{i + 1} · {html.escape(path)}</div>
+              <div class="cos-diff-line"><span class="cos-diff-prefix cos-diff-minus">-</span><span>{old_html}</span></div>
+              <div class="cos-diff-line"><span class="cos-diff-prefix cos-diff-plus">+</span><span>{new_html}</span></div>
+            </div>
+            ''',
+            unsafe_allow_html=True,
+        )
 
 
 def _render_chat_panel() -> None:
@@ -445,6 +494,8 @@ def _render_chat_panel() -> None:
 
     user_msg = st.chat_input("告诉 AI 你想怎么改，或问它建议", key="tailor_chat_input")
     if user_msg:
+        if st.session_state.tailor_chat.get("pending"):
+            st.session_state.tailor_chat["pending"] = None
         st.session_state.tailor_chat["messages"].append(
             {"role": "user", "content": user_msg}
         )
@@ -672,10 +723,11 @@ with col_left:
                     alert_danger(f"失败：{e}")
 
     # ── Chat 面板（紧跟在 JD 下方）──
-    st.markdown("---")
-    st.markdown("##### AI 对话修改")
-    st.caption("整体重写 / 段落重写 / 精细 patch / 建议 / 反问")
-    _render_chat_panel()
+    if ENABLE_CHAT_TAILOR:
+        st.markdown("---")
+        st.markdown("##### AI 对话修改")
+        st.caption("整体重写 / 段落重写 / 精细 patch / 建议 / 反问")
+        _render_chat_panel()
 
     # 历史版本（chat 下方）
     st.markdown("---")
@@ -956,7 +1008,7 @@ with tab_preview:
         st.caption("（没上传过原 PDF · 去「主简历 → 上传文件」上传后，这里可以看到原件对照）")
 
     # ── 可编辑简历（主编辑区）──────────────────────────
-    st.markdown("##### 在线编辑（改完点下方「生成预览」看新 PDF）")
+    st.markdown("##### 在线编辑（改动后自动刷新预览）")
     _render_manual_editor()
 
     st.markdown("---")
@@ -966,30 +1018,41 @@ with tab_preview:
         json.dumps(st.session_state.tailor_data, ensure_ascii=False, sort_keys=True).encode("utf-8")
     ).hexdigest()
     cached_key = st.session_state.get("_tailor_preview_key")
-    pdf_bytes = st.session_state.get("_tailor_preview_pdf") if cached_key == preview_key else None
+    cache_valid = cached_key == preview_key
+    pdf_bytes = st.session_state.get("_tailor_preview_pdf") if cache_valid else None
+    png_bytes = st.session_state.get("_tailor_preview_png") if cache_valid else None
+    preview_error = st.session_state.get("_tailor_preview_error") if cache_valid else None
 
-    if st.button("生成预览", type="primary", use_container_width=True):
+    if not cache_valid or (pdf_bytes is None and not preview_error):
         try:
-            with st.spinner("正在生成 PDF 预览..."):
+            with st.spinner("正在刷新 PDF 预览..."):
                 pdf_bytes = resume_renderer.render_pdf_bytes(st.session_state.tailor_data)
+                png_bytes, _backend = resume_renderer.render_preview_png(
+                    st.session_state.tailor_data,
+                    pdf_bytes=pdf_bytes,
+                )
             st.session_state["_tailor_preview_key"] = preview_key
             st.session_state["_tailor_preview_pdf"] = pdf_bytes
+            st.session_state["_tailor_preview_png"] = png_bytes
+            st.session_state["_tailor_preview_backend"] = _backend
+            st.session_state["_tailor_preview_error"] = None
+            preview_error = None
         except Exception as e:
             pdf_bytes = None
-            alert_danger(f"预览渲染失败：{e}")
+            png_bytes = None
+            preview_error = str(e)
+            st.session_state["_tailor_preview_key"] = preview_key
+            st.session_state["_tailor_preview_pdf"] = None
+            st.session_state["_tailor_preview_png"] = None
+            st.session_state["_tailor_preview_backend"] = None
+            st.session_state["_tailor_preview_error"] = preview_error
 
-    if pdf_bytes is None:
-        st.caption("点击「生成预览」后才会生成 PDF，避免每次打开页面都触发渲染。")
+    if preview_error:
+        alert_danger(f"预览渲染失败：{preview_error}")
+    elif pdf_bytes is None:
+        st.caption("等待可渲染的简历内容。")
     else:
         # 三级降级预览：PyMuPDF → pdf2image → iframe
-        png_bytes = None
-        try:
-            png_bytes, _backend = resume_renderer.render_preview_png(
-                st.session_state.tailor_data
-            )
-        except Exception as _e:
-            png_bytes = None
-
         if png_bytes:
             st.image(png_bytes, width=650)
         else:

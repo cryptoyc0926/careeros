@@ -141,6 +141,7 @@ def render_preview_png(
     data: dict[str, Any],
     template_name: str = DEFAULT_TEMPLATE,
     dpi: int = 110,
+    pdf_bytes: bytes | None = None,
 ) -> tuple[bytes | None, str]:
     """
     生成简历第一页 PNG 预览。三级降级：
@@ -151,7 +152,8 @@ def render_preview_png(
     返回：(png_bytes, backend_name)。backend 可选值：pymupdf / pdf2image / iframe。
     失败时 png_bytes 为 None，调用方应降级展示 PDF。
     """
-    pdf_bytes = render_pdf_bytes(data, template_name=template_name)
+    if pdf_bytes is None:
+        pdf_bytes = render_pdf_bytes(data, template_name=template_name)
 
     # 方案 1：PyMuPDF（首选）
     try:

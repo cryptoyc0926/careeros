@@ -28,3 +28,4 @@
 2026-04-21 09:10 Codex · P0-1 绑定在线编辑 widget 与 tailor_data，避免 rerun 或 chat patch 后字段丢失/旧值覆盖
 2026-04-21 09:11 Codex · P0-2 覆盖 stChatInput textarea 为白底深字，修复 chat 输入框深色底
 2026-04-21 09:13 Codex · P0-3 保存版本时写入 chat_transcript_json，加载历史版本时恢复 chat 消息流水
+2026-04-21 09:42 Codex · P1/P2 简历定制页改为 hash 节流自动预览、字符级 patch diff、ENABLE_CHAT_TAILOR 开关，并在新 chat 消息时清理旧 pending patch
