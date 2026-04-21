@@ -31,3 +31,4 @@
 2026-04-21 09:42 Codex · P1/P2 简历定制页改为 hash 节流自动预览、字符级 patch diff、ENABLE_CHAT_TAILOR 开关，并在新 chat 消息时清理旧 pending patch
 2026-04-21 10:18 Codex · resume_tailor 右侧编辑区改为 A4 文档式结构化画布，替换 expander 表单；保留 tailor_data 绑定、Chat patch、自动预览和导出链路
 2026-04-21 10:34 Codex · resume_tailor 方向 A 第一步：新增 components/resume_canvas.py，集中 A4 画布 CSS 与安全 HTML 渲染 helper
+2026-04-21 10:46 Codex · resume_tailor 方向 A 第二步：手动编辑与 Chat patch 共用 _apply_resume_patch，画布字段支持编辑/保存/取消与 bullet 插入/排序/删除

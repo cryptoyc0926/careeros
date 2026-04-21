@@ -50,6 +50,26 @@ CANVAS_CSS = """
   .cos-canvas .cv-inline-actions{display:flex;gap:6px;align-items:center;}
   .cos-canvas .cv-bullet-read{font-size:13.5px;line-height:1.55;margin:2px 0;}
   .cos-canvas .cv-muted{color:#6e6e73;}
+  h1.cv-name{font-size:28px;font-weight:600;letter-spacing:-.01em;
+    margin:0 0 6px;text-align:center;color:#1d1d1f;}
+  .cv-contact{text-align:center;color:#6e6e73;font-size:13px;margin-bottom:20px;}
+  h2.cv-section{font-size:15px;font-weight:600;margin:22px 0 10px;
+    padding-bottom:4px;border-bottom:1px solid rgba(29,29,31,0.12);letter-spacing:.02em;
+    color:#1d1d1f;}
+  .cv-item{position:relative;margin-bottom:10px;}
+  .cv-item-head{display:flex;justify-content:space-between;align-items:baseline;
+    gap:16px;font-size:13.5px;margin-bottom:4px;color:#1d1d1f;}
+  .cv-item-title{font-weight:600;}
+  .cv-item-role{font-weight:500;color:#1d1d1f;margin-left:8px;}
+  .cv-item-meta{color:#6e6e73;font-size:12px;white-space:nowrap;}
+  .cv-skill-row,.cv-bullet-read,.cv-edu-row{font-size:13.5px;line-height:1.55;color:#1d1d1f;}
+  .cv-skill-row{margin:3px 0;}
+  .cv-skill-label{font-weight:600;margin-right:6px;}
+  .cv-edu-row{display:flex;justify-content:space-between;gap:16px;margin:4px 0;}
+  .cv-edit-pane{
+    margin:8px 0 14px;padding:10px 12px;border-radius:8px;
+    background:#f5f5f7;border:1px solid rgba(29,29,31,0.08);
+  }
   .cos-canvas-anchor{display:none;}
   div[data-testid="stVerticalBlockBorderWrapper"]:has(.cos-canvas-anchor){
     background:#ffffff !important;
@@ -139,4 +159,3 @@ def render_item_header(company: str, role: str, date: str) -> None:
         '</div>',
         unsafe_allow_html=True,
     )
-

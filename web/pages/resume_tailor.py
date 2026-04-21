@@ -24,6 +24,7 @@ import streamlit as st
 from config import settings
 from services import resume_renderer, resume_tailor
 from services.ai_engine import AIError
+from components import resume_canvas
 from components.ui import page_header, section_title, divider, score_hero_card, alert_success, alert_info, alert_warning, alert_danger
 
 DB_PATH = settings.db_full_path
@@ -336,6 +337,32 @@ from services import resume_chat as _resume_chat_service  # noqa: E402
 from services import resume_patch as _resume_patch_mod  # noqa: E402
 
 
+def _apply_resume_patch(patch: list[dict], label: str) -> bool:
+    """Apply manual/chat edits through the same patch + validation + undo path."""
+    new_data, errors = _resume_patch_mod.apply_patch(st.session_state.tailor_data, patch)
+    if errors:
+        alert_danger("Patch 应用失败：\n" + "\n".join(errors))
+        return False
+    from services.resume_validator import validate_tailored
+    try:
+        report = validate_tailored(st.session_state.tailor_data, new_data, None)
+    except Exception:
+        report = None
+    if report and report.hard_errors:
+        alert_danger(
+            f"硬规则校验失败（{len(report.hard_errors)} 条），拒绝应用：\n"
+            + "\n".join(
+                f"- [{e['rule']}] {e['location']}: {e['message']}"
+                for e in report.hard_errors[:5]
+            )
+        )
+        return False
+    _push_undo_snapshot(label=label)
+    st.session_state.tailor_data = new_data
+    _clear_tailor_preview_cache()
+    return True
+
+
 def _render_patch_diff(patch: list[dict], tailor_data: dict) -> None:
     """把 pending_patch 渲染成字符级 old/new 对比。"""
     st.markdown(
@@ -454,38 +481,14 @@ def _render_chat_panel() -> None:
                          key="tailor_patch_apply",
                          use_container_width=True):
                 patch = pending["patch"]
-                new_data, errors = _resume_patch_mod.apply_patch(
-                    st.session_state.tailor_data, patch
-                )
-                if errors:
-                    alert_danger("Patch 应用失败：\n" + "\n".join(errors))
-                else:
-                    from services.resume_validator import validate_tailored
-                    try:
-                        report = validate_tailored(
-                            st.session_state.tailor_data, new_data, None,
-                        )
-                    except Exception:
-                        report = None
-                    has_hard = bool(report and report.hard_errors)
-                    if has_hard:
-                        alert_danger(
-                            f"硬规则校验失败（{len(report.hard_errors)} 条），拒绝应用：\n"
-                            + "\n".join(
-                                f"- [{e['rule']}] {e['location']}: {e['message']}"
-                                for e in report.hard_errors[:5]
-                            )
-                        )
-                    else:
-                        _push_undo_snapshot(label="chat · 应用 patch")
-                        st.session_state.tailor_data = new_data
-                        for m in reversed(st.session_state.tailor_chat["messages"]):
-                            if m["role"] == "assistant":
-                                m.setdefault("_meta", {})["applied"] = True
-                                break
-                        st.session_state.tailor_chat["pending"] = None
-                        alert_success("已应用，预览可刷新查看")
-                        st.rerun()
+                if _apply_resume_patch(patch, label="chat · 应用 patch"):
+                    for m in reversed(st.session_state.tailor_chat["messages"]):
+                        if m["role"] == "assistant":
+                            m.setdefault("_meta", {})["applied"] = True
+                            break
+                    st.session_state.tailor_chat["pending"] = None
+                    alert_success("已应用，预览可刷新查看")
+                    st.rerun()
         with pcol_b:
             if st.button("取消", key="tailor_patch_cancel",
                          use_container_width=True):
@@ -765,155 +768,265 @@ with col_left:
                 st.rerun()
 
 
-def _render_resume_canvas_styles() -> None:
-    st.markdown(
-        """
-        <style>
-        .cos-canvas-anchor{display:none;}
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.cos-canvas-anchor){
-          background:#ffffff !important;
-          border:1px solid rgba(29,29,31,0.10) !important;
-          border-radius:2px !important;
-          box-shadow:0 10px 28px rgba(29,29,31,0.08) !important;
-          max-width:860px !important;
-          margin:0 auto 18px auto !important;
-          padding:26px 30px 30px 30px !important;
-        }
-        .cos-canvas-section{
-          margin:18px 0 10px 0;
-          padding:5px 10px;
-          background:#e8e8ea;
-          color:#111;
-          font-size:18px;
-          font-weight:700;
-          letter-spacing:0;
-          line-height:1.25;
-        }
-        .cos-canvas-row{
-          display:flex;
-          justify-content:space-between;
-          gap:18px;
-          align-items:flex-start;
-          margin:8px 0 2px 0;
-          color:#111;
-        }
-        .cos-canvas-company{font-size:16px;font-weight:700;color:#111;}
-        .cos-canvas-date{font-size:15px;font-weight:700;color:#111;white-space:nowrap;}
-        .cos-canvas-edu{font-size:15px;font-weight:700;color:#111;}
-        .cos-canvas-note{color:#6e6e73;font-size:12px;text-align:center;margin-bottom:8px;}
-        input[aria-label^="canvas_"],
-        textarea[aria-label^="canvas_"]{
-          background:transparent !important;
-          border:1px solid transparent !important;
-          box-shadow:none !important;
-          color:#111 !important;
-          border-radius:4px !important;
-          padding:2px 4px !important;
-          line-height:1.45 !important;
-        }
-        div[data-baseweb="input"]:has(input[aria-label^="canvas_"]),
-        div[data-baseweb="textarea"]:has(textarea[aria-label^="canvas_"]){
-          background:transparent !important;
-          border:1px solid transparent !important;
-          box-shadow:none !important;
-        }
-        [data-testid="stTextInput"]:has(input[aria-label^="canvas_"]) div,
-        [data-testid="stTextArea"]:has(textarea[aria-label^="canvas_"]) div{
-          background:transparent !important;
-          border-color:transparent !important;
-          box-shadow:none !important;
-        }
-        input[aria-label^="canvas_"]:focus,
-        textarea[aria-label^="canvas_"]:focus{
-          background:#fff !important;
-          border-color:rgba(0,113,227,0.35) !important;
-          box-shadow:0 0 0 3px rgba(0,113,227,0.10) !important;
-        }
-        div[data-baseweb="input"]:has(input[aria-label^="canvas_"]:focus),
-        div[data-baseweb="textarea"]:has(textarea[aria-label^="canvas_"]:focus){
-          background:#fff !important;
-          border-color:rgba(0,113,227,0.35) !important;
-          box-shadow:0 0 0 3px rgba(0,113,227,0.10) !important;
-        }
-        input[aria-label="canvas_name"]{
-          text-align:center !important;
-          font-size:34px !important;
-          font-weight:800 !important;
-          line-height:1.1 !important;
-          padding:0 !important;
-        }
-        input[aria-label^="canvas_contact_"]{
-          text-align:center !important;
-          font-size:13px !important;
-        }
-        input[aria-label^="canvas_role_"]{
-          text-align:center !important;
-          font-weight:700 !important;
-          font-size:15px !important;
-        }
-        textarea[aria-label="canvas_profile"]{
-          font-size:14px !important;
-          min-height:84px !important;
-        }
-        textarea[aria-label^="canvas_bullet_"]{
-          font-size:14px !important;
-          min-height:42px !important;
-        }
-        input[aria-label^="canvas_skill_label_"]{
-          font-weight:700 !important;
-          font-size:14px !important;
-        }
-        input[aria-label^="canvas_skill_text_"]{
-          font-size:14px !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+def _path_state_key(prefix: str, path: str) -> str:
+    digest = hashlib.sha1(path.encode("utf-8")).hexdigest()[:12]
+    return f"{prefix}_{digest}"
 
 
-def _render_canvas_section(title: str) -> None:
-    st.markdown(f'<div class="cos-canvas-section">{html.escape(title)}</div>', unsafe_allow_html=True)
+def _open_inline_edit(path: str, current_value: object) -> None:
+    st.session_state[_path_state_key("edit_mode", path)] = True
+    st.session_state[_path_state_key("edit_draft", path)] = "" if current_value is None else str(current_value)
 
 
-def _render_experience_canvas(section_key: str, title: str, role_prefix: str, bullet_prefix: str) -> None:
+def _close_inline_edit(path: str) -> None:
+    st.session_state.pop(_path_state_key("edit_mode", path), None)
+    st.session_state.pop(_path_state_key("edit_draft", path), None)
+
+
+def _render_edit_pane(path: str, current_value: object, *, height: int = 90, label: str = "内容") -> None:
+    draft_key = _path_state_key("edit_draft", path)
+    if draft_key not in st.session_state:
+        st.session_state[draft_key] = "" if current_value is None else str(current_value)
+    st.markdown('<div class="cv-edit-pane">', unsafe_allow_html=True)
+    new_value = st.text_area(label, key=draft_key, height=height, label_visibility="collapsed")
+    save_col, cancel_col, _ = st.columns([1, 1, 5])
+    with save_col:
+        if st.button("保存", key=_path_state_key("save", path), use_container_width=True):
+            if _apply_resume_patch(
+                [{"op": "replace", "path": path, "value": new_value}],
+                label=f"手动编辑 {path}",
+            ):
+                _close_inline_edit(path)
+                st.rerun()
+    with cancel_col:
+        if st.button("取消", key=_path_state_key("cancel", path), use_container_width=True):
+            _close_inline_edit(path)
+            st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def _render_editable_block(path: str, value: object, *, block_class: str, height: int = 90) -> None:
+    if st.session_state.get(_path_state_key("edit_mode", path)):
+        _render_edit_pane(path, value, height=height)
+        return
+    text_col, edit_col = st.columns([8, 1])
+    with text_col:
+        st.markdown(
+            f'<div class="{block_class}">{resume_canvas.rich_text_html(value)}</div>',
+            unsafe_allow_html=True,
+        )
+    with edit_col:
+        if st.button("编辑", key=_path_state_key("edit", path), use_container_width=True):
+            _open_inline_edit(path, value)
+            st.rerun()
+
+
+def _render_basics_editor(data: dict) -> None:
+    basics = data.setdefault("basics", {})
+    fields = [
+        ("name", "姓名"),
+        ("email", "邮箱"),
+        ("phone", "电话"),
+        ("target_role", "求职意向"),
+        ("city", "城市"),
+        ("availability", "到岗时间"),
+    ]
+    with st.expander("编辑基本信息", expanded=False):
+        cols = st.columns(2)
+        values: dict[str, str] = {}
+        for idx, (field, label) in enumerate(fields):
+            key = f"basics_edit_{field}"
+            current = _sync_bound_widget(key, basics.get(field, ""))
+            with cols[idx % 2]:
+                values[field] = st.text_input(label, key=key, value=current)
+                st.session_state[f"_tailor_widget_source::{key}"] = values[field]
+        save_col, cancel_col = st.columns(2)
+        with save_col:
+            if st.button("保存基本信息", key="save_basics_canvas", type="primary", use_container_width=True):
+                patch = [
+                    {"op": "replace", "path": f"basics.{field}", "value": value}
+                    for field, value in values.items()
+                ]
+                if _apply_resume_patch(patch, label="手动编辑基本信息"):
+                    st.rerun()
+        with cancel_col:
+            if st.button("取消基本信息编辑", key="cancel_basics_canvas", use_container_width=True):
+                for field, _label in fields:
+                    st.session_state.pop(f"basics_edit_{field}", None)
+                    st.session_state.pop(f"_tailor_widget_source::basics_edit_{field}", None)
+                st.rerun()
+
+
+def _bullet_list_path(section_key: str, item_idx: int) -> str:
+    return f"{section_key}[{item_idx}].bullets"
+
+
+def _apply_bullet_action(section_key: str, item_idx: int, bullet_idx: int, action: str) -> None:
+    bullets = st.session_state.tailor_data.get(section_key, [])[item_idx].get("bullets", [])
+    list_path = _bullet_list_path(section_key, item_idx)
+    if action == "insert":
+        insert_path = f"{list_path}[{bullet_idx + 1}]"
+        if _apply_resume_patch([{"op": "add", "path": insert_path, "value": ""}], label="插入 bullet"):
+            _open_inline_edit(insert_path, "")
+            st.rerun()
+    elif action == "delete":
+        if len(bullets) <= 1:
+            alert_warning("至少保留 1 条 bullet")
+            return
+        if _apply_resume_patch(
+            [{"op": "remove", "path": f"{list_path}[{bullet_idx}]"}],
+            label="删除 bullet",
+        ):
+            st.rerun()
+    elif action in ("up", "down"):
+        target_idx = bullet_idx - 1 if action == "up" else bullet_idx + 1
+        if target_idx < 0 or target_idx >= len(bullets):
+            return
+        order = list(range(len(bullets)))
+        order[bullet_idx], order[target_idx] = order[target_idx], order[bullet_idx]
+        if _apply_resume_patch(
+            [{"op": "reorder", "path": list_path, "value": order}],
+            label="调整 bullet 顺序",
+        ):
+            st.rerun()
+
+
+def _render_bullet(section_key: str, item_idx: int, bullet_idx: int, bullet: str) -> None:
+    path = f"{_bullet_list_path(section_key, item_idx)}[{bullet_idx}]"
+    if st.session_state.get(_path_state_key("edit_mode", path)):
+        _render_edit_pane(path, bullet, height=86)
+        return
+    text_col, edit_col, add_col, up_col, down_col, del_col = st.columns([8, 0.9, 0.9, 0.9, 0.9, 0.9])
+    with text_col:
+        st.markdown(
+            f'<div class="cv-bullet-read">• {resume_canvas.rich_text_html(bullet)}</div>',
+            unsafe_allow_html=True,
+        )
+    with edit_col:
+        if st.button("编辑", key=_path_state_key("edit", path), use_container_width=True):
+            _open_inline_edit(path, bullet)
+            st.rerun()
+    with add_col:
+        if st.button("插入", key=_path_state_key("insert", path), use_container_width=True):
+            _apply_bullet_action(section_key, item_idx, bullet_idx, "insert")
+    with up_col:
+        if st.button("上移", key=_path_state_key("up", path), use_container_width=True):
+            _apply_bullet_action(section_key, item_idx, bullet_idx, "up")
+    with down_col:
+        if st.button("下移", key=_path_state_key("down", path), use_container_width=True):
+            _apply_bullet_action(section_key, item_idx, bullet_idx, "down")
+    with del_col:
+        if st.button("删除", key=_path_state_key("delete", path), use_container_width=True):
+            _apply_bullet_action(section_key, item_idx, bullet_idx, "delete")
+
+
+def _render_experience_canvas(section_key: str, title: str) -> None:
     data = st.session_state.tailor_data
     items = data.get(section_key) or []
     if not items:
         return
-    _render_canvas_section(title)
+    resume_canvas.render_section(title)
     for item_idx, item in enumerate(items):
-        left, role_col, right = st.columns([1.35, 1.15, 0.9])
-        with left:
-            st.markdown(
-                f'<div class="cos-canvas-company">{html.escape(str(item.get("company", "")))}</div>',
-                unsafe_allow_html=True,
-            )
-        with role_col:
-            item["role"] = _bound_text_input(
-                f"canvas_role_{section_key}_{item_idx}",
-                item.get("role", ""),
-                f"{role_prefix}_{item_idx}",
-                label_visibility="collapsed",
-            )
-        with right:
-            st.markdown(
-                f'<div class="cos-canvas-date">{html.escape(str(item.get("date", "")))}</div>',
-                unsafe_allow_html=True,
-            )
-
+        st.markdown('<div class="cv-item">', unsafe_allow_html=True)
+        role_path = f"{section_key}[{item_idx}].role"
+        if st.session_state.get(_path_state_key("edit_mode", role_path)):
+            resume_canvas.render_item_header(item.get("company", ""), "", item.get("date", ""))
+            _render_edit_pane(role_path, item.get("role", ""), height=70)
+        else:
+            head_col, edit_col = st.columns([8, 1])
+            with head_col:
+                resume_canvas.render_item_header(
+                    item.get("company", ""),
+                    item.get("role", ""),
+                    item.get("date", ""),
+                )
+            with edit_col:
+                if st.button("编辑", key=_path_state_key("edit", role_path), use_container_width=True):
+                    _open_inline_edit(role_path, item.get("role", ""))
+                    st.rerun()
         for bullet_idx, bullet in enumerate(item.get("bullets") or []):
-            item["bullets"][bullet_idx] = _bound_text_area(
-                f"canvas_bullet_{section_key}_{item_idx}_{bullet_idx}",
-                bullet,
-                key=f"{bullet_prefix}_{item_idx}_{bullet_idx}",
-                height=46,
-                label_visibility="collapsed",
+            _render_bullet(section_key, item_idx, bullet_idx, bullet)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
+def _render_skills_canvas() -> None:
+    skills = st.session_state.tailor_data.get("skills") or []
+    if not skills:
+        return
+    resume_canvas.render_section("技能证书")
+    for skill_idx, skill in enumerate(skills):
+        label_path = f"skills[{skill_idx}].label"
+        text_path = f"skills[{skill_idx}].text"
+        if (
+            st.session_state.get(_path_state_key("edit_mode", label_path))
+            or st.session_state.get(_path_state_key("edit_mode", text_path))
+        ):
+            label_key = _path_state_key("edit_draft", label_path)
+            text_key = _path_state_key("edit_draft", text_path)
+            st.session_state.setdefault(label_key, skill.get("label", ""))
+            st.session_state.setdefault(text_key, skill.get("text", ""))
+            st.markdown('<div class="cv-edit-pane">', unsafe_allow_html=True)
+            c1, c2 = st.columns([1.2, 4])
+            with c1:
+                new_label = st.text_input("技能分类", key=label_key, label_visibility="collapsed")
+            with c2:
+                new_text = st.text_input("技能内容", key=text_key, label_visibility="collapsed")
+            save_col, cancel_col, _ = st.columns([1, 1, 5])
+            with save_col:
+                if st.button("保存", key=f"save_skill_{skill_idx}", use_container_width=True):
+                    patch = [
+                        {"op": "replace", "path": label_path, "value": new_label},
+                        {"op": "replace", "path": text_path, "value": new_text},
+                    ]
+                    if _apply_resume_patch(patch, label="手动编辑技能"):
+                        _close_inline_edit(label_path)
+                        _close_inline_edit(text_path)
+                        st.rerun()
+            with cancel_col:
+                if st.button("取消", key=f"cancel_skill_{skill_idx}", use_container_width=True):
+                    _close_inline_edit(label_path)
+                    _close_inline_edit(text_path)
+                    st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+        else:
+            row_col, edit_col = st.columns([8, 1])
+            with row_col:
+                st.markdown(
+                    '<div class="cv-skill-row">'
+                    f'<span class="cv-skill-label">{resume_canvas.esc(skill.get("label", ""))}</span>'
+                    f'{resume_canvas.rich_text_html(skill.get("text", ""))}'
+                    '</div>',
+                    unsafe_allow_html=True,
+                )
+            with edit_col:
+                if st.button("编辑", key=f"edit_skill_{skill_idx}", use_container_width=True):
+                    _open_inline_edit(label_path, skill.get("label", ""))
+                    _open_inline_edit(text_path, skill.get("text", ""))
+                    st.rerun()
+
+
+def _render_education_canvas() -> None:
+    education = st.session_state.tailor_data.get("education") or []
+    if not education:
+        return
+    resume_canvas.render_section("教育背景")
+    for edu in education:
+        school = resume_canvas.esc(edu.get("school", ""))
+        major = resume_canvas.esc(edu.get("major", ""))
+        date = resume_canvas.esc(edu.get("date", ""))
+        st.markdown(
+            f'<div class="cv-edu-row"><span><b>{school}</b> · {major}</span><span class="cv-item-meta">{date}</span></div>',
+            unsafe_allow_html=True,
+        )
+        for bullet in edu.get("bullets") or []:
+            st.markdown(
+                f'<div class="cv-bullet-read">• {resume_canvas.rich_text_html(bullet)}</div>',
+                unsafe_allow_html=True,
             )
 
 
 def _render_resume_canvas_editor() -> None:
-    """A4 文档式结构化编辑器：视觉像简历，底层仍写回 tailor_data。"""
+    """A4 document canvas: read mode first, edit mode only after an explicit click."""
     data = st.session_state.tailor_data
     meta = st.session_state.tailor_meta
 
@@ -923,44 +1036,15 @@ def _render_resume_canvas_editor() -> None:
             f"{meta.get('change_notes', '')}"
         )
 
-    _render_resume_canvas_styles()
+    resume_canvas.render_canvas_css()
 
     with st.container(border=True):
         st.markdown('<span class="cos-canvas-anchor"></span>', unsafe_allow_html=True)
-        basics = data.setdefault("basics", {})
-        basics["name"] = _bound_text_input(
-            "canvas_name",
-            basics.get("name", ""),
-            "tailor_basics_name",
-            label_visibility="collapsed",
-        )
-        contact_cols = st.columns([1.1, 1.4, 1.4, 1.0, 1.1])
-        contact_fields = [
-            ("phone", "tailor_basics_phone"),
-            ("email", "tailor_basics_email"),
-            ("target_role", "tailor_basics_target_role"),
-            ("city", "tailor_basics_city"),
-            ("availability", "tailor_basics_availability"),
-        ]
-        for col, (field, key) in zip(contact_cols, contact_fields):
-            with col:
-                basics[field] = _bound_text_input(
-                    f"canvas_contact_{field}",
-                    basics.get(field, ""),
-                    key,
-                    label_visibility="collapsed",
-                )
-        basics["photo"] = basics.get("photo", "")
+        _render_basics_editor(data)
+        resume_canvas.render_basics_header(data.setdefault("basics", {}), data.get("education"))
 
-        _render_canvas_section("个人总结")
-        data["profile"] = _bound_text_area(
-            "canvas_profile",
-            data.get("profile", ""),
-            "tailor_profile",
-            height=100,
-            label_visibility="collapsed",
-        )
-
+        resume_canvas.render_section("个人总结")
+        _render_editable_block("profile", data.get("profile", ""), block_class="cv-bullet-read", height=112)
         if st.button("仅重写个人总结", key="rw_profile"):
             if not st.session_state.tailor_jd:
                 alert_warning("请先在左栏粘贴 JD")
@@ -977,45 +1061,10 @@ def _render_resume_canvas_editor() -> None:
                     except AIError as e:
                         alert_danger(str(e))
 
-        _render_experience_canvas("projects", "项目经历", "proj_role", "proj_b")
-        _render_experience_canvas("internships", "实习经历", "intern_role", "intern_b")
-
-        skills = data.get("skills") or []
-        if skills:
-            _render_canvas_section("技能证书")
-            for s_idx, s in enumerate(skills):
-                cols = st.columns([1.05, 4])
-                with cols[0]:
-                    s["label"] = _bound_text_input(
-                        f"canvas_skill_label_{s_idx}",
-                        s.get("label", ""),
-                        f"skill_l_{s_idx}",
-                        label_visibility="collapsed",
-                    )
-                with cols[1]:
-                    s["text"] = _bound_text_input(
-                        f"canvas_skill_text_{s_idx}",
-                        s.get("text", ""),
-                        f"skill_t_{s_idx}",
-                        label_visibility="collapsed",
-                    )
-
-        education = data.get("education") or []
-        if education:
-            _render_canvas_section("教育背景")
-            for edu in education:
-                school = html.escape(str(edu.get("school", "")))
-                major = html.escape(str(edu.get("major", "")))
-                date = html.escape(str(edu.get("date", "")))
-                st.markdown(
-                    f'<div class="cos-canvas-row"><span class="cos-canvas-edu">{school} · {major}</span>'
-                    f'<span class="cos-canvas-date">{date}</span></div>',
-                    unsafe_allow_html=True,
-                )
-                for bullet in edu.get("bullets") or []:
-                    st.markdown(f"- {html.escape(str(bullet))}")
-
-    st.session_state.tailor_data = data
+        _render_experience_canvas("projects", "项目经历")
+        _render_experience_canvas("internships", "实习经历")
+        _render_skills_canvas()
+        _render_education_canvas()
 
 
 # ═══ 右栏：实时预览 + 深度评估 ═══
