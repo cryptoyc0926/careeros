@@ -364,7 +364,7 @@ span[data-baseweb="tag"] svg {
     background: #0071e3 !important;
 }
 
-/* Apple card hover（替代被 sanitizer 剥离的 onmouseover）*/
+/* Apple card hover（避免使用会被 sanitizer 剥离的内联事件）*/
 a.apple-action-card:hover,
 a.apple-feature-card:hover {
     box-shadow: 0 8px 24px rgba(0,0,0,0.08) !important;

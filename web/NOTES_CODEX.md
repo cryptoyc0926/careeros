@@ -18,3 +18,4 @@
 2026-04-21 | fix | web/app.py, web/pages/settings_page.py | 修正公开 Demo 的 Provider 文案、默认选择和云端路径展示，避免误导用户填写 Claude Key 或暴露绝对路径
 2026-04-21 | fix | web/pages/resume_tailor.py | 为公开 Demo 增加占位符主简历兜底，避免在线编辑核心页出现 **** 占位标题
 2026-04-21 | fix | web/pages/resume_tailor.py, web/services/resume_renderer.py | PDF 预览增加 PyMuPDF/pdf2image/iframe 三级降级，避免云端缺少 pdftoppm 时预览失败
+2026-04-21 | fix | web/app.py | 清理 CSS 注释中的红线关键词，避免内联事件 grep 误报
