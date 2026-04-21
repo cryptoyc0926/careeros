@@ -32,7 +32,16 @@ DB_PATH = settings.db_full_path
 page_header("简历定制 & 在线编辑")
 # 压缩顶部留白
 st.markdown(
-    "<style>div.block-container{padding-top:1.2rem !important;max-width:1500px !important}</style>",
+    """
+    <style>
+    div.block-container,
+    .main .block-container,
+    [data-testid="stMainBlockContainer"]{
+      padding-top:1.2rem !important;
+      max-width:1500px !important;
+    }
+    </style>
+    """,
     unsafe_allow_html=True,
 )
 
@@ -344,16 +353,47 @@ def _apply_resume_patch(patch: list[dict], label: str) -> bool:
         alert_danger("Patch 应用失败：\n" + "\n".join(errors))
         return False
     from services.resume_validator import validate_tailored
+    current_report = None
     try:
+        current_report = validate_tailored(
+            st.session_state.tailor_data,
+            st.session_state.tailor_data,
+            None,
+        )
         report = validate_tailored(st.session_state.tailor_data, new_data, None)
     except Exception:
         report = None
-    if report and report.hard_errors:
+
+    def _issue_value(issue, field: str) -> str:
+        if isinstance(issue, dict):
+            return str(issue.get(field, ""))
+        return str(getattr(issue, field, ""))
+
+    def _issue_fingerprint(issue) -> tuple[str, str, str, str, str]:
+        return (
+            _issue_value(issue, "rule"),
+            _issue_value(issue, "location"),
+            _issue_value(issue, "message"),
+            _issue_value(issue, "expected"),
+            _issue_value(issue, "actual"),
+        )
+
+    baseline_errors = {
+        _issue_fingerprint(e)
+        for e in (current_report.hard_errors if current_report else [])
+    }
+    new_hard_errors = [
+        e
+        for e in (report.hard_errors if report else [])
+        if _issue_fingerprint(e) not in baseline_errors
+    ]
+
+    if new_hard_errors:
         alert_danger(
-            f"硬规则校验失败（{len(report.hard_errors)} 条），拒绝应用：\n"
+            f"硬规则校验失败（新增 {len(new_hard_errors)} 条），拒绝应用：\n"
             + "\n".join(
-                f"- [{e['rule']}] {e['location']}: {e['message']}"
-                for e in report.hard_errors[:5]
+                f"- [{_issue_value(e, 'rule')}] {_issue_value(e, 'location')}: {_issue_value(e, 'message')}"
+                for e in new_hard_errors[:5]
             )
         )
         return False
@@ -1054,7 +1094,7 @@ def _render_edit_pane(path: str, current_value: object, *, height: int = 90, lab
         st.session_state[draft_key] = "" if current_value is None else str(current_value)
     st.markdown('<div class="cv-edit-pane">', unsafe_allow_html=True)
     new_value = st.text_area(label, key=draft_key, height=height, label_visibility="collapsed")
-    save_col, cancel_col, _ = st.columns([1, 1, 5])
+    save_col, cancel_col, _ = st.columns([2, 2, 1])
     with save_col:
         if st.button("保存", key=_path_state_key("save", path), use_container_width=True):
             if _apply_resume_patch(
@@ -1161,27 +1201,27 @@ def _render_bullet(section_key: str, item_idx: int, bullet_idx: int, bullet: str
     if st.session_state.get(_path_state_key("edit_mode", path)):
         _render_edit_pane(path, bullet, height=86)
         return
-    text_col, edit_col, add_col, up_col, down_col, del_col = st.columns([8, 0.9, 0.9, 0.9, 0.9, 0.9])
+    text_col, edit_col, add_col, up_col, down_col, del_col = st.columns([8, 0.55, 0.55, 0.55, 0.55, 0.55])
     with text_col:
         st.markdown(
             f'<div class="cv-bullet-read">• {resume_canvas.rich_text_html(bullet)}</div>',
             unsafe_allow_html=True,
         )
     with edit_col:
-        if st.button("编辑", key=_path_state_key("edit", path), use_container_width=True):
+        if st.button("改", key=_path_state_key("edit", path), use_container_width=True, help="编辑这一条"):
             _open_inline_edit(path, bullet)
             st.rerun()
     with add_col:
-        if st.button("插入", key=_path_state_key("insert", path), use_container_width=True):
+        if st.button("加", key=_path_state_key("insert", path), use_container_width=True, help="在下方插入一条"):
             _apply_bullet_action(section_key, item_idx, bullet_idx, "insert")
     with up_col:
-        if st.button("上移", key=_path_state_key("up", path), use_container_width=True):
+        if st.button("↑", key=_path_state_key("up", path), use_container_width=True, help="上移"):
             _apply_bullet_action(section_key, item_idx, bullet_idx, "up")
     with down_col:
-        if st.button("下移", key=_path_state_key("down", path), use_container_width=True):
+        if st.button("↓", key=_path_state_key("down", path), use_container_width=True, help="下移"):
             _apply_bullet_action(section_key, item_idx, bullet_idx, "down")
     with del_col:
-        if st.button("删除", key=_path_state_key("delete", path), use_container_width=True):
+        if st.button("×", key=_path_state_key("delete", path), use_container_width=True, help="删除这一条"):
             _apply_bullet_action(section_key, item_idx, bullet_idx, "delete")
 
 
@@ -1236,7 +1276,7 @@ def _render_skills_canvas() -> None:
                 new_label = st.text_input("技能分类", key=label_key, label_visibility="collapsed")
             with c2:
                 new_text = st.text_input("技能内容", key=text_key, label_visibility="collapsed")
-            save_col, cancel_col, _ = st.columns([1, 1, 5])
+            save_col, cancel_col, _ = st.columns([2, 2, 1])
             with save_col:
                 if st.button("保存", key=f"save_skill_{skill_idx}", use_container_width=True):
                     patch = [

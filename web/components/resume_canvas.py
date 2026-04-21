@@ -71,23 +71,27 @@ CANVAS_CSS = """
     background:#f5f5f7;border:1px solid rgba(29,29,31,0.08);
   }
   .cos-canvas-anchor{display:none;}
-  div[data-testid="stVerticalBlockBorderWrapper"]:has(.cos-canvas-anchor){
+  div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] .cos-canvas-anchor){
     background:#ffffff !important;
     border:1px solid rgba(29,29,31,0.08) !important;
     border-radius:6px !important;
     box-shadow:0 1px 3px rgba(0,0,0,0.04),0 12px 32px rgba(0,0,0,0.06) !important;
+    box-sizing:border-box !important;
     max-width:820px !important;
     margin:0 auto 32px auto !important;
     padding:48px 56px !important;
   }
-  div[data-testid="stVerticalBlockBorderWrapper"]:has(.cos-canvas-anchor) .stButton button{
-    padding:5px 10px !important;
+  div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] .cos-canvas-anchor) > div > div[data-testid="stVerticalBlock"]{
+    width:100% !important;
+  }
+  div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] .cos-canvas-anchor) .stButton button{
+    padding:5px 8px !important;
     min-height:30px !important;
     font-size:12px !important;
     border-radius:6px !important;
   }
-  div[data-testid="stVerticalBlockBorderWrapper"]:has(.cos-canvas-anchor) textarea,
-  div[data-testid="stVerticalBlockBorderWrapper"]:has(.cos-canvas-anchor) input{
+  div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] .cos-canvas-anchor) textarea,
+  div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] .cos-canvas-anchor) input{
     font-size:13.5px !important;
   }
   .cos-preview-thumb img{
