@@ -15,7 +15,6 @@ from __future__ import annotations
 import json
 import hashlib
 import sqlite3
-import tempfile
 from pathlib import Path
 
 import streamlit as st
@@ -44,6 +43,7 @@ def load_master() -> dict | None:
         return None
     return {
         "id": row["id"],
+        "updated_at": row["updated_at"],
         "basics": json.loads(row["basics_json"]),
         "profile": json.loads(row["profile_json"]),
         "projects": json.loads(row["projects_json"]),
@@ -57,6 +57,7 @@ def demo_master_fallback() -> dict:
     """公开 Demo 的兜底主简历：只在云端样例数据为空/占位符时使用。"""
     return {
         "id": 0,
+        "updated_at": "demo-fallback",
         "basics": {
             "name": "杨 超",
             "phone": "186-8795-0926",
@@ -188,15 +189,112 @@ if settings.demo_mode and master_needs_demo_fallback(master):
 
 
 # ── Session state ────────────────────────────────────────
+master_signature = f"{master.get('id')}:{master.get('updated_at', '')}"
 if (
+    st.session_state.get("_tailor_master_signature") != master_signature
+    or
     "tailor_data" not in st.session_state
     or (demo_fallback_active and master_needs_demo_fallback(st.session_state.tailor_data))
 ):
     st.session_state.tailor_data = flatten_master_for_render(master)
+    st.session_state.tailor_meta = {}
+    st.session_state.tailor_jd = ""
+    st.session_state["_tailor_preview_key"] = None
+    st.session_state["_tailor_preview_pdf"] = None
+    st.session_state["_tailor_master_signature"] = master_signature
 if "tailor_meta" not in st.session_state:
     st.session_state.tailor_meta = {}
 if "tailor_jd" not in st.session_state:
     st.session_state.tailor_jd = ""
+if "tailor_chat" not in st.session_state:
+    st.session_state.tailor_chat = {"messages": [], "pending": None}
+if "tailor_undo_stack" not in st.session_state:
+    st.session_state.tailor_undo_stack = []
+
+
+# ── 撤销栈工具 ────────────────────────────────────────────
+import copy as _copy_tailor  # noqa: E402  — 避免顶部再加一个 import copy
+_UNDO_LIMIT = 10
+
+
+def _push_undo_snapshot(label: str = "") -> None:
+    """把当前 tailor_data 深拷贝入栈（用于撤销）。"""
+    st.session_state.tailor_undo_stack.append(
+        {"label": label, "data": _copy_tailor.deepcopy(st.session_state.tailor_data)}
+    )
+    if len(st.session_state.tailor_undo_stack) > _UNDO_LIMIT:
+        st.session_state.tailor_undo_stack = st.session_state.tailor_undo_stack[-_UNDO_LIMIT:]
+
+
+def _pop_undo() -> str | None:
+    if not st.session_state.tailor_undo_stack:
+        return None
+    snap = st.session_state.tailor_undo_stack.pop()
+    st.session_state.tailor_data = snap["data"]
+    return snap.get("label") or "上一步"
+
+
+# ── Chat 面板（Phase 1 · 全宽折叠区，置于三栏之上）────────
+from services import resume_chat as _resume_chat_service  # noqa: E402
+
+with st.expander("与 AI 对话修改（beta · 支持「整体重写」「给建议」）", expanded=False):
+    chat_col_main, chat_col_side = st.columns([3, 1])
+    with chat_col_main:
+        for msg in st.session_state.tailor_chat["messages"][-8:]:
+            role = msg["role"]
+            with st.chat_message("user" if role == "user" else "assistant"):
+                st.markdown(msg.get("content", ""))
+                meta = msg.get("_meta") or {}
+                if meta.get("applied"):
+                    st.caption("已应用到简历 · 可点右侧「撤销」回退")
+                if meta.get("advice_md"):
+                    with st.container():
+                        st.markdown(meta["advice_md"])
+
+        user_msg = st.chat_input("告诉 AI 你想怎么改，或问它建议", key="tailor_chat_input")
+        if user_msg:
+            # 记用户消息
+            st.session_state.tailor_chat["messages"].append(
+                {"role": "user", "content": user_msg}
+            )
+            with st.spinner("AI 思考中..."):
+                resp = _resume_chat_service.handle_user_message(
+                    user_msg=user_msg,
+                    tailor_data=st.session_state.tailor_data,
+                    master=master,
+                    jd_text=st.session_state.tailor_jd or "",
+                )
+            assistant_meta: dict = {"intent": resp.get("intent")}
+            if resp["intent"] == "full_rewrite" and resp.get("new_data"):
+                _push_undo_snapshot(label="chat · 整体重写")
+                new_data = resp["new_data"]
+                new_meta = new_data.pop("_meta", {}) if isinstance(new_data, dict) else {}
+                st.session_state.tailor_data = new_data
+                st.session_state.tailor_meta = new_meta
+                assistant_meta["applied"] = True
+                content = resp.get("explanation") or "已整体重写"
+            elif resp["intent"] == "advice_only":
+                assistant_meta["advice_md"] = resp.get("advice_md") or ""
+                content = resp.get("explanation") or "建议如下："
+            else:
+                content = f"出错了：{resp.get('error') or resp.get('explanation')}"
+            st.session_state.tailor_chat["messages"].append(
+                {"role": "assistant", "content": content, "_meta": assistant_meta}
+            )
+            st.rerun()
+
+    with chat_col_side:
+        st.caption(f"撤销栈：{len(st.session_state.tailor_undo_stack)} 步")
+        if st.button("撤销上一步", key="tailor_undo_btn", use_container_width=True,
+                     disabled=not st.session_state.tailor_undo_stack):
+            label = _pop_undo()
+            if label:
+                alert_info(f"已撤销：{label}")
+                st.rerun()
+        if st.button("清空对话", key="tailor_chat_clear_btn", use_container_width=True,
+                     disabled=not st.session_state.tailor_chat["messages"]):
+            st.session_state.tailor_chat = {"messages": [], "pending": None}
+            st.rerun()
 
 
 # ── 布局：三栏 ──────────────────────────────────────────
@@ -335,6 +433,7 @@ with col_left:
         reset = st.button("重置为主简历", use_container_width=True)
 
     if reset:
+        _push_undo_snapshot(label="重置为主简历")
         st.session_state.tailor_data = flatten_master_for_render(master)
         st.session_state.tailor_meta = {}
         st.session_state.tailor_jd = ""
@@ -343,6 +442,7 @@ with col_left:
     if go and jd_text.strip():
         with st.spinner("正在分析 JD 并重写简历..."):
             try:
+                _push_undo_snapshot(label="JD 定制重写")
                 tailored = resume_tailor.tailor_resume(master, jd_text)
                 meta = tailored.pop("_meta", {})
                 st.session_state.tailor_data = tailored
@@ -674,7 +774,7 @@ with tab_preview:
             png_bytes = None
 
         if png_bytes:
-            st.image(png_bytes, use_container_width=True)
+            st.image(png_bytes, width=650)
         else:
             # 最终降级：直接嵌 PDF iframe
             import base64 as _b64p
