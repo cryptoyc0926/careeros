@@ -15,3 +15,4 @@
 2026-04-21 | fix(Claude) | web/pages/settings_page.py | audit #2 API Key 和 SMTP 密码不再预填到 input DOM，改为掩码状态+留空保留
 2026-04-21 | feat(Claude) | web/services/job_filter.py, scripts/clean_excluded_companies.py | audit #6 排除公司（字节/腾讯/蚂蚁/网易）过滤器+一次性清洗脚本
 2026-04-21 | fix(Claude) | web/pages/{jd_browser,pipeline,job_pool,jd_input}.py | audit #6 展示层 + 导入层套用 job_filter，清洗脚本删除 jobs_pool 9 条 / job_descriptions 2 条
+2026-04-21 | fix | web/app.py, web/pages/settings_page.py | 修正公开 Demo 的 Provider 文案、默认选择和云端路径展示，避免误导用户填写 Claude Key 或暴露绝对路径

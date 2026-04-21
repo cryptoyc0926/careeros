@@ -614,9 +614,9 @@ if settings.demo_mode:
         'border-left:3px solid #d97706;padding:10px 16px;border-radius:10px;'
         'font-size:13px;color:#1d1d1f;margin:0 0 12px 0;'
         'font-family:\'SF Pro Text\',-apple-system,sans-serif">'
-        '<b>在线 Demo（BYO-Key 模式）</b> · '
-        '这是公开演示实例。请在「系统设置」填入<b>你自己的</b> Claude API Key 才能生成内容；'
-        '作者不会保存你的任何数据。想长期使用请 '
+        '<b>在线 Demo（共享额度 + BYO-Key）</b> · '
+        '默认可用 Codex 共享额度试用，也可以在「系统设置」填入你自己的 API Key；'
+        '作者不会保存你的任何数据。长期使用建议 '
         '<a href="https://github.com/cryptoyc0926/careeros" target="_blank" style="color:#0071e3;text-decoration:none">自部署本地版</a>。'
         '</div>',
         unsafe_allow_html=True,
@@ -660,9 +660,9 @@ with st.sidebar:
     _apple_divider()
     st.caption("Career OS v0.1.0")
     if settings.has_anthropic_key:
-        st.caption("Claude API · 已连接")
+        st.caption("AI Provider · 已连接")
     else:
-        st.caption("Claude API · 未配置")
+        st.caption("AI Provider · 未配置")
 
 # ── 运行选中页面 ──────────────────────────────────────────
 nav.run()

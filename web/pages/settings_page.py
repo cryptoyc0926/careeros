@@ -13,7 +13,7 @@ from components.ui import (
 page_shell_header(
     title="系统设置",
     subtitle="配置个人画像、API 与系统路径",
-    right_hint=("Claude API · 已连接" if settings.has_anthropic_key else "Claude API · 未配置"),
+    right_hint=("AI Provider · 已连接" if settings.has_anthropic_key else "AI Provider · 未配置"),
 )
 
 # ══════════════════════════════════════════════════════════
@@ -172,13 +172,14 @@ _PROVIDERS = {
     },
 }
 
-# 读取当前 provider（优先 session_state > .env）
+# 读取当前 provider（优先 session_state > .env > settings 默认值）
 _current_provider = (
     st.session_state.get("LLM_PROVIDER")
-    or current_env.get("LLM_PROVIDER", "anthropic")
+    or current_env.get("LLM_PROVIDER")
+    or settings.llm_provider
 ).lower()
 if _current_provider not in _PROVIDERS:
-    _current_provider = "anthropic"
+    _current_provider = "codex"
 
 # 云端 BYO-Key 提示
 if settings.demo_mode:
@@ -360,7 +361,7 @@ from datetime import datetime
 bc1, bc2 = st.columns(2)
 
 with bc1:
-    st.markdown("**📤 导出数据**")
+    st.markdown("**导出数据**")
     if settings.db_full_path.exists():
         try:
             payload = export_all_data(settings.db_full_path, settings.user_profile)
@@ -426,18 +427,38 @@ alert_info(
     "云端部署（Streamlit Cloud / HF Space）重启后非持久化目录会丢数据，建议通过 UI 填的信息写回 GitHub 永久化。"
 )
 
-paths_data = [
-    ("数据库",    str(settings.db_full_path.resolve()),
-                  "SQLite 单文件，存储所有岗位、简历、投递、面试、素材等"),
-    ("主简历",    str(settings.master_resume_full_path.resolve()),
-                  "旧版 YAML 格式主简历（已被 DB 的 resume_master 表取代，可忽略）"),
-    ("输出目录",  str(settings.output_full_path.resolve()),
-                  "生成的定制简历 PDF / 求职信 / 导出文件存放处"),
-    ("项目根目录", str(settings.project_root.resolve()),
-                  "Streamlit 应用代码所在目录"),
-]
-for label, path, desc in paths_data:
-    path_row_card(label, path, exists=Path(path).exists())
+if settings.demo_mode:
+    paths_data = [
+        ("数据库",    "云端临时数据库",
+                      settings.db_full_path,
+                      "SQLite 单文件，存储所有岗位、简历、投递、面试、素材等"),
+        ("主简历",    "主简历数据表",
+                      settings.master_resume_full_path,
+                      "旧版 YAML 格式主简历（已被 DB 的 resume_master 表取代，可忽略）"),
+        ("输出目录",  "云端临时输出目录",
+                      settings.output_full_path,
+                      "生成的定制简历 PDF / 求职信 / 导出文件存放处"),
+        ("项目根目录", "云端应用目录",
+                      settings.project_root,
+                      "Streamlit 应用代码所在目录"),
+    ]
+else:
+    paths_data = [
+        ("数据库",    str(settings.db_full_path.resolve()),
+                      settings.db_full_path,
+                      "SQLite 单文件，存储所有岗位、简历、投递、面试、素材等"),
+        ("主简历",    str(settings.master_resume_full_path.resolve()),
+                      settings.master_resume_full_path,
+                      "旧版 YAML 格式主简历（已被 DB 的 resume_master 表取代，可忽略）"),
+        ("输出目录",  str(settings.output_full_path.resolve()),
+                      settings.output_full_path,
+                      "生成的定制简历 PDF / 求职信 / 导出文件存放处"),
+        ("项目根目录", str(settings.project_root.resolve()),
+                      settings.project_root,
+                      "Streamlit 应用代码所在目录"),
+    ]
+for label, display_path, actual_path, desc in paths_data:
+    path_row_card(label, display_path, exists=Path(actual_path).exists())
     st.caption(f"　　↳ {desc}")
 
 # ── 数据库信息 ─────────────────────────────────────────────
