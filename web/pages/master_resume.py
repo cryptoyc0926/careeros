@@ -93,6 +93,10 @@ def load_master() -> dict:
             "skills": [],
             "education": [],
         }
+    # 兼容老库：新列可能不存在
+    keys = row.keys() if hasattr(row, "keys") else []
+    docx_blob = row["original_docx_blob"] if "original_docx_blob" in keys else None
+    docx_name = row["original_docx_filename"] if "original_docx_filename" in keys else None
     return {
         "id": row["id"],
         "basics": json.loads(row["basics_json"]),
@@ -101,6 +105,8 @@ def load_master() -> dict:
         "internships": json.loads(row["internships_json"]),
         "skills": json.loads(row["skills_json"]),
         "education": json.loads(row["education_json"]),
+        "original_docx_blob": docx_blob,
+        "original_docx_filename": docx_name,
     }
 
 
@@ -113,6 +119,16 @@ def save_master(m: dict) -> None:
         pass
 
     conn = sqlite3.connect(DB_PATH)
+    # 检测新列是否存在（幂等兼容未 migrate 的老库）
+    existing_cols = {r[1] for r in conn.execute("PRAGMA table_info(resume_master)").fetchall()}
+    has_docx_cols = "original_docx_blob" in existing_cols and "original_docx_filename" in existing_cols
+
+    # DOCX blob 优先从 session_state 的 _pending_docx_blob 拉，其次沿用 m 里现有的
+    pending_blob = st.session_state.get("_pending_docx_blob")
+    pending_name = st.session_state.get("_pending_docx_name")
+    docx_blob = pending_blob if pending_blob is not None else m.get("original_docx_blob")
+    docx_name = pending_name if pending_name else m.get("original_docx_filename")
+
     payload = (
         json.dumps(m["basics"], ensure_ascii=False),
         json.dumps(m["profile"], ensure_ascii=False),
@@ -122,24 +138,51 @@ def save_master(m: dict) -> None:
         json.dumps(m["education"], ensure_ascii=False),
     )
     if m.get("id"):
-        conn.execute(
-            """UPDATE resume_master
-               SET basics_json=?, profile_json=?, projects_json=?,
-                   internships_json=?, skills_json=?, education_json=?,
-                   updated_at=CURRENT_TIMESTAMP
-               WHERE id=?""",
-            (*payload, m["id"]),
-        )
+        if has_docx_cols:
+            conn.execute(
+                """UPDATE resume_master
+                   SET basics_json=?, profile_json=?, projects_json=?,
+                       internships_json=?, skills_json=?, education_json=?,
+                       original_docx_blob=COALESCE(?, original_docx_blob),
+                       original_docx_filename=COALESCE(?, original_docx_filename),
+                       updated_at=CURRENT_TIMESTAMP
+                   WHERE id=?""",
+                (*payload, docx_blob, docx_name, m["id"]),
+            )
+        else:
+            conn.execute(
+                """UPDATE resume_master
+                   SET basics_json=?, profile_json=?, projects_json=?,
+                       internships_json=?, skills_json=?, education_json=?,
+                       updated_at=CURRENT_TIMESTAMP
+                   WHERE id=?""",
+                (*payload, m["id"]),
+            )
     else:
-        conn.execute(
-            """INSERT INTO resume_master
-               (basics_json, profile_json, projects_json,
-                internships_json, skills_json, education_json)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            payload,
-        )
+        if has_docx_cols:
+            conn.execute(
+                """INSERT INTO resume_master
+                   (basics_json, profile_json, projects_json,
+                    internships_json, skills_json, education_json,
+                    original_docx_blob, original_docx_filename)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (*payload, docx_blob, docx_name),
+            )
+        else:
+            conn.execute(
+                """INSERT INTO resume_master
+                   (basics_json, profile_json, projects_json,
+                    internships_json, skills_json, education_json)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                payload,
+            )
     conn.commit()
     conn.close()
+
+    # 落库后清掉 pending bytes 避免后续重复写入
+    if pending_blob is not None:
+        st.session_state.pop("_pending_docx_blob", None)
+        st.session_state.pop("_pending_docx_name", None)
 
 
 def clear_tailor_state_after_master_change() -> None:
@@ -418,6 +461,12 @@ with tab_upload:
             f.seek(0)
             st.session_state["uploaded_pdf_bytes"] = f.read()
             st.session_state["uploaded_pdf_name"] = f.name
+            f.seek(0)
+        # 保存 DOCX bytes 供 Phase 2 原版回写使用
+        if f.name.lower().endswith(".docx"):
+            f.seek(0)
+            st.session_state["_pending_docx_blob"] = f.read()
+            st.session_state["_pending_docx_name"] = f.name
             f.seek(0)
         with st.spinner("提取文本..."):
             text = extract_resume_text(f)

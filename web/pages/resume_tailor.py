@@ -26,7 +26,12 @@ from components.ui import page_header, section_title, divider, score_hero_card, 
 
 DB_PATH = settings.db_full_path
 
-page_header("简历定制 & 在线编辑", subtitle="在线微调生成版本")
+page_header("简历定制 & 在线编辑")
+# 压缩顶部留白
+st.markdown(
+    "<style>div.block-container{padding-top:1.2rem !important}</style>",
+    unsafe_allow_html=True,
+)
 
 if not settings.has_anthropic_key:
     alert_danger("Claude API Key 未配置，请前往 **设置** 页面。")
@@ -41,6 +46,7 @@ def load_master() -> dict | None:
     conn.close()
     if not row:
         return None
+    keys = row.keys() if hasattr(row, "keys") else []
     return {
         "id": row["id"],
         "updated_at": row["updated_at"],
@@ -50,6 +56,8 @@ def load_master() -> dict | None:
         "internships": json.loads(row["internships_json"]),
         "skills": json.loads(row["skills_json"]),
         "education": json.loads(row["education_json"]),
+        "original_docx_blob": row["original_docx_blob"] if "original_docx_blob" in keys else None,
+        "original_docx_filename": row["original_docx_filename"] if "original_docx_filename" in keys else None,
     }
 
 
@@ -237,68 +245,169 @@ def _pop_undo() -> str | None:
 # ── Chat 面板（Phase 1 · 全宽折叠区，置于三栏之上）────────
 from services import resume_chat as _resume_chat_service  # noqa: E402
 
-with st.expander("与 AI 对话修改（beta · 支持「整体重写」「给建议」）", expanded=False):
-    chat_col_main, chat_col_side = st.columns([3, 1])
-    with chat_col_main:
-        for msg in st.session_state.tailor_chat["messages"][-8:]:
-            role = msg["role"]
-            with st.chat_message("user" if role == "user" else "assistant"):
-                st.markdown(msg.get("content", ""))
-                meta = msg.get("_meta") or {}
-                if meta.get("applied"):
-                    st.caption("已应用到简历 · 可点右侧「撤销」回退")
-                if meta.get("advice_md"):
-                    with st.container():
-                        st.markdown(meta["advice_md"])
+from services import resume_patch as _resume_patch_mod  # noqa: E402
 
-        user_msg = st.chat_input("告诉 AI 你想怎么改，或问它建议", key="tailor_chat_input")
-        if user_msg:
-            # 记用户消息
-            st.session_state.tailor_chat["messages"].append(
-                {"role": "user", "content": user_msg}
-            )
-            with st.spinner("AI 思考中..."):
-                resp = _resume_chat_service.handle_user_message(
-                    user_msg=user_msg,
-                    tailor_data=st.session_state.tailor_data,
-                    master=master,
-                    jd_text=st.session_state.tailor_jd or "",
-                )
-            assistant_meta: dict = {"intent": resp.get("intent")}
-            if resp["intent"] == "full_rewrite" and resp.get("new_data"):
-                _push_undo_snapshot(label="chat · 整体重写")
-                new_data = resp["new_data"]
-                new_meta = new_data.pop("_meta", {}) if isinstance(new_data, dict) else {}
-                st.session_state.tailor_data = new_data
-                st.session_state.tailor_meta = new_meta
-                assistant_meta["applied"] = True
-                content = resp.get("explanation") or "已整体重写"
-            elif resp["intent"] == "advice_only":
-                assistant_meta["advice_md"] = resp.get("advice_md") or ""
-                content = resp.get("explanation") or "建议如下："
-            else:
-                content = f"出错了：{resp.get('error') or resp.get('explanation')}"
-            st.session_state.tailor_chat["messages"].append(
-                {"role": "assistant", "content": content, "_meta": assistant_meta}
-            )
-            st.rerun()
 
-    with chat_col_side:
+def _render_patch_diff(patch: list[dict], tailor_data: dict) -> None:
+    """把 pending_patch 渲染成 old/new 对比。"""
+    for i, p in enumerate(patch):
+        path = p.get("path", "")
+        new_val = p.get("value", "")
+        try:
+            old_val = _resume_patch_mod.get_by_path(tailor_data, path)
+        except Exception:
+            old_val = "(不存在)"
+        st.caption(f"#{i+1} · `{path}`")
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("**原文**")
+            st.code(str(old_val), language="text")
+        with c2:
+            st.markdown("**新版**")
+            st.code(str(new_val), language="text")
+
+
+def _render_chat_panel() -> None:
+    """Chat 面板：消息流 + pending patch diff + 输入框 + 撤销/清空。"""
+    top_c1, top_c2 = st.columns([1, 1])
+    with top_c1:
         st.caption(f"撤销栈：{len(st.session_state.tailor_undo_stack)} 步")
+    with top_c2:
         if st.button("撤销上一步", key="tailor_undo_btn", use_container_width=True,
                      disabled=not st.session_state.tailor_undo_stack):
             label = _pop_undo()
             if label:
                 alert_info(f"已撤销：{label}")
                 st.rerun()
-        if st.button("清空对话", key="tailor_chat_clear_btn", use_container_width=True,
-                     disabled=not st.session_state.tailor_chat["messages"]):
-            st.session_state.tailor_chat = {"messages": [], "pending": None}
-            st.rerun()
+
+    # 用浅色自定义气泡代替 st.chat_message（避免深色头像框）
+    st.markdown(
+        """
+        <style>
+        .cos-chat-msg{padding:10px 14px;border-radius:12px;margin:6px 0;
+          border:1px solid rgba(29,29,31,0.08);line-height:1.55;}
+        .cos-chat-user{background:#f5f7fb;}
+        .cos-chat-bot{background:#ffffff;}
+        .cos-chat-role{font-size:11px;color:#6e6e73;margin-bottom:4px;letter-spacing:0.3px;}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    for msg in st.session_state.tailor_chat["messages"][-8:]:
+        role = msg["role"]
+        klass = "cos-chat-user" if role == "user" else "cos-chat-bot"
+        label = "你" if role == "user" else "AI"
+        content_html = msg.get("content", "")
+        st.markdown(
+            f'<div class="cos-chat-msg {klass}"><div class="cos-chat-role">{label}</div>{content_html}</div>',
+            unsafe_allow_html=True,
+        )
+        meta = msg.get("_meta") or {}
+        if meta.get("applied"):
+            st.caption("已应用到简历 · 可点「撤销上一步」回退")
+        if meta.get("advice_md"):
+            st.markdown(meta["advice_md"], unsafe_allow_html=True)
+        if meta.get("clarify_question"):
+            alert_warning(meta["clarify_question"])
+
+    # Pending patch 渲染
+    pending = st.session_state.tailor_chat.get("pending")
+    if pending and pending.get("patch"):
+        alert_info(pending.get("explanation") or "准备修改（待确认）")
+        _render_patch_diff(pending["patch"], st.session_state.tailor_data)
+        pcol_a, pcol_b = st.columns(2)
+        with pcol_a:
+            if st.button("应用修改", type="primary",
+                         key="tailor_patch_apply",
+                         use_container_width=True):
+                patch = pending["patch"]
+                new_data, errors = _resume_patch_mod.apply_patch(
+                    st.session_state.tailor_data, patch
+                )
+                if errors:
+                    alert_danger("Patch 应用失败：\n" + "\n".join(errors))
+                else:
+                    from services.resume_validator import validate_tailored
+                    try:
+                        report = validate_tailored(
+                            st.session_state.tailor_data, new_data, None,
+                        )
+                    except Exception:
+                        report = None
+                    has_hard = bool(report and report.hard_errors)
+                    if has_hard:
+                        alert_danger(
+                            f"硬规则校验失败（{len(report.hard_errors)} 条），拒绝应用：\n"
+                            + "\n".join(
+                                f"- [{e['rule']}] {e['location']}: {e['message']}"
+                                for e in report.hard_errors[:5]
+                            )
+                        )
+                    else:
+                        _push_undo_snapshot(label="chat · 应用 patch")
+                        st.session_state.tailor_data = new_data
+                        for m in reversed(st.session_state.tailor_chat["messages"]):
+                            if m["role"] == "assistant":
+                                m.setdefault("_meta", {})["applied"] = True
+                                break
+                        st.session_state.tailor_chat["pending"] = None
+                        alert_success("已应用，预览可刷新查看")
+                        st.rerun()
+        with pcol_b:
+            if st.button("取消", key="tailor_patch_cancel",
+                         use_container_width=True):
+                st.session_state.tailor_chat["pending"] = None
+                st.rerun()
+
+    user_msg = st.chat_input("告诉 AI 你想怎么改，或问它建议", key="tailor_chat_input")
+    if user_msg:
+        st.session_state.tailor_chat["messages"].append(
+            {"role": "user", "content": user_msg}
+        )
+        with st.spinner("AI 思考中..."):
+            resp = _resume_chat_service.handle_user_message(
+                user_msg=user_msg,
+                tailor_data=st.session_state.tailor_data,
+                master=master,
+                jd_text=st.session_state.tailor_jd or "",
+            )
+        assistant_meta: dict = {"intent": resp.get("intent")}
+        if resp["intent"] == "full_rewrite" and resp.get("new_data"):
+            _push_undo_snapshot(label="chat · 整体重写")
+            new_data = resp["new_data"]
+            new_meta = new_data.pop("_meta", {}) if isinstance(new_data, dict) else {}
+            st.session_state.tailor_data = new_data
+            st.session_state.tailor_meta = new_meta
+            st.session_state.tailor_chat["pending"] = None
+            assistant_meta["applied"] = True
+            content = resp.get("explanation") or "已整体重写"
+        elif resp["intent"] in ("section_rewrite", "patch_ops") and resp.get("pending_patch"):
+            st.session_state.tailor_chat["pending"] = {
+                "explanation": resp.get("explanation") or "",
+                "patch": resp.get("pending_patch"),
+            }
+            content = resp.get("explanation") or "准备修改（待你确认）"
+        elif resp["intent"] == "advice_only":
+            assistant_meta["advice_md"] = resp.get("advice_md") or ""
+            content = resp.get("explanation") or "建议如下："
+        elif resp["intent"] == "clarify":
+            assistant_meta["clarify_question"] = resp.get("clarify_question") or ""
+            content = resp.get("explanation") or "需要先确认一下："
+        else:
+            content = f"出错了：{resp.get('error') or resp.get('explanation')}"
+        st.session_state.tailor_chat["messages"].append(
+            {"role": "assistant", "content": content, "_meta": assistant_meta}
+        )
+        st.rerun()
+
+    if st.button("清空对话", key="tailor_chat_clear_btn", use_container_width=True,
+                 disabled=not st.session_state.tailor_chat["messages"]):
+        st.session_state.tailor_chat = {"messages": [], "pending": None}
+        st.rerun()
 
 
-# ── 布局：三栏 ──────────────────────────────────────────
-col_left, col_mid, col_right = st.columns([1.0, 1.8, 1.4])
+# ── 布局：两栏（左 JD+Chat / 右 预览+评估）──────────────
+col_left, col_right = st.columns([1.0, 1.8])
 
 # ═══ 左栏：JD 输入 + 历史版本 ═══
 with col_left:
@@ -478,7 +587,13 @@ with col_left:
                 else:
                     alert_danger(f"失败：{e}")
 
-    # 历史版本
+    # ── Chat 面板（紧跟在 JD 下方）──
+    st.markdown("---")
+    st.markdown("##### AI 对话修改")
+    st.caption("整体重写 / 段落重写 / 精细 patch / 建议 / 反问")
+    _render_chat_panel()
+
+    # 历史版本（chat 下方）
     st.markdown("---")
     st.markdown("##### 历史版本")
     conn = sqlite3.connect(DB_PATH)
@@ -508,10 +623,8 @@ with col_left:
                 st.rerun()
 
 
-# ═══ 中栏：分段编辑器 ═══
-with col_mid:
-    st.markdown("##### 在线编辑")
-
+def _render_manual_editor() -> None:
+    """手动分段编辑器（页面底部折叠区）。"""
     data = st.session_state.tailor_data
     meta = st.session_state.tailor_meta
 
@@ -521,7 +634,6 @@ with col_mid:
             f"{meta.get('change_notes', '')}"
         )
 
-    # Basics
     with st.expander("基本信息", expanded=False):
         data["basics"]["target_role"] = st.text_input(
             "求职意向", value=data["basics"].get("target_role", "")
@@ -530,12 +642,9 @@ with col_mid:
             "期望城市", value=data["basics"].get("city", "")
         )
 
-    # Profile
     with st.expander("个人总结", expanded=True):
         data["profile"] = st.text_area(
-            "profile",
-            value=data["profile"],
-            height=120,
+            "profile", value=data["profile"], height=120,
             label_visibility="collapsed",
         )
         if st.button("仅重写此段", key="rw_profile"):
@@ -554,8 +663,7 @@ with col_mid:
                     except AIError as e:
                         alert_danger(str(e))
 
-    # Projects
-    with st.expander("项目经历", expanded=True):
+    with st.expander("项目经历", expanded=False):
         for p_idx, p in enumerate(data["projects"]):
             st.markdown(f"**{p['company']}** — {p['date']}")
             p["role"] = st.text_input(
@@ -563,15 +671,12 @@ with col_mid:
             )
             for b_idx, b in enumerate(p["bullets"]):
                 p["bullets"][b_idx] = st.text_area(
-                    f"bullet {b_idx + 1}",
-                    value=b,
-                    key=f"proj_{p_idx}_b_{b_idx}",
-                    height=68,
+                    f"bullet {b_idx + 1}", value=b,
+                    key=f"proj_{p_idx}_b_{b_idx}", height=68,
                     label_visibility="collapsed",
                 )
 
-    # Internships
-    with st.expander("实习经历", expanded=True):
+    with st.expander("实习经历", expanded=False):
         for i_idx, i in enumerate(data["internships"]):
             st.markdown(f"**{i['company']}** — {i['date']}")
             i["role"] = st.text_input(
@@ -579,14 +684,11 @@ with col_mid:
             )
             for b_idx, b in enumerate(i["bullets"]):
                 i["bullets"][b_idx] = st.text_area(
-                    f"bullet {b_idx + 1}",
-                    value=b,
-                    key=f"intern_{i_idx}_b_{b_idx}",
-                    height=68,
+                    f"bullet {b_idx + 1}", value=b,
+                    key=f"intern_{i_idx}_b_{b_idx}", height=68,
                     label_visibility="collapsed",
                 )
 
-    # Skills
     with st.expander("技能证书", expanded=False):
         for s_idx, s in enumerate(data["skills"]):
             cols = st.columns([1, 4])
@@ -743,6 +845,11 @@ with tab_preview:
     else:
         st.caption("（没上传过原 PDF · 去「主简历 → 上传文件」上传后，这里可以看到原件对照）")
 
+    # ── 可编辑简历（主编辑区）──────────────────────────
+    st.markdown("##### 在线编辑（改完点下方「生成预览」看新 PDF）")
+    _render_manual_editor()
+
+    st.markdown("---")
     st.markdown("##### 系统生成的新 PDF（基于模板）")
 
     preview_key = hashlib.sha256(
@@ -787,14 +894,137 @@ with tab_preview:
             )
             st.caption("（PNG 预览依赖不可用，已改为浏览器内嵌 PDF 视图）")
 
-        st.download_button(
-            "下载 PDF",
-            data=pdf_bytes,
-            file_name=f"{st.session_state.tailor_data['basics'].get('name', 'resume')}_简历_{st.session_state.tailor_data['basics'].get('target_role', '定制版')}.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-            type="primary",
-        )
+        # ── 三个下载入口 ───────────────────────────────
+        _base_name = f"{st.session_state.tailor_data['basics'].get('name', 'resume')}_简历_{st.session_state.tailor_data['basics'].get('target_role', '定制版')}"
+        dl_c1, dl_c2, dl_c3 = st.columns(3)
+        with dl_c1:
+            st.download_button(
+                "下载 PDF（内置模板）",
+                data=pdf_bytes,
+                file_name=f"{_base_name}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                type="primary",
+            )
+
+        # 内置模板 DOCX（简洁重新渲染，不保持原样）
+        def _build_template_docx(tdata: dict) -> bytes:
+            from docx import Document
+            from docx.shared import Pt
+            import io as _io, re as _re
+            doc = Document()
+            b = tdata.get("basics", {})
+            h = doc.add_heading(b.get("name") or "简历", level=0)
+            contact = " · ".join(x for x in [b.get("phone"), b.get("email"), b.get("city"), b.get("target_role")] if x)
+            if contact:
+                doc.add_paragraph(contact)
+
+            def _add_rich(p, text: str):
+                # 渲染 <b>...</b>
+                parts = _re.split(r"(<b>.*?</b>)", text or "", flags=_re.IGNORECASE | _re.DOTALL)
+                for part in parts:
+                    if not part:
+                        continue
+                    m = _re.match(r"<b>(.*?)</b>", part, flags=_re.IGNORECASE | _re.DOTALL)
+                    if m:
+                        r = p.add_run(m.group(1)); r.bold = True
+                    else:
+                        p.add_run(_re.sub(r"<[^>]+>", "", part))
+
+            prof = tdata.get("profile")
+            if isinstance(prof, dict):
+                pool = prof.get("pool") or []
+                default_id = prof.get("default")
+                prof = next((x.get("text","") for x in pool if x.get("id")==default_id), (pool[0].get("text","") if pool else ""))
+            if prof:
+                doc.add_heading("个人总结", level=1)
+                _add_rich(doc.add_paragraph(), prof)
+
+            for sec, title in (("projects", "项目经历"), ("internships", "实习经历")):
+                items = tdata.get(sec) or []
+                if not items:
+                    continue
+                doc.add_heading(title, level=1)
+                for it in items:
+                    head = f"{it.get('company','')} — {it.get('role','')} · {it.get('date','')}"
+                    p = doc.add_paragraph()
+                    r = p.add_run(head); r.bold = True
+                    for bu in (it.get("bullets") or []):
+                        pb = doc.add_paragraph(style="List Bullet")
+                        _add_rich(pb, bu)
+
+            skills = tdata.get("skills") or []
+            if skills:
+                doc.add_heading("技能证书", level=1)
+                for s in skills:
+                    p = doc.add_paragraph()
+                    r = p.add_run(f"{s.get('label','')}："); r.bold = True
+                    p.add_run(s.get("text",""))
+
+            edu = tdata.get("education") or []
+            if edu:
+                doc.add_heading("教育背景", level=1)
+                for e in edu:
+                    school = e.get("school") or e.get("company") or ""
+                    major = e.get("major") or e.get("role") or ""
+                    date = e.get("date","")
+                    p = doc.add_paragraph()
+                    r = p.add_run(f"{school} · {major} · {date}"); r.bold = True
+                    for bu in (e.get("bullets") or []):
+                        pb = doc.add_paragraph(style="List Bullet")
+                        _add_rich(pb, bu)
+
+            buf = _io.BytesIO(); doc.save(buf); return buf.getvalue()
+
+        with dl_c2:
+            # 原版回写 DOCX（只有上传过 DOCX 才显示）
+            _orig_blob = master.get("original_docx_blob")
+            if _orig_blob:
+                if st.button("下载 DOCX（原版回写）", key="dl_docx_inplace",
+                             use_container_width=True):
+                    try:
+                        from services.resume_docx_writer import rewrite_docx, DocxRewriteUnsupported
+                        old_for_diff = flatten_master_for_render(master)
+                        new_bytes = rewrite_docx(
+                            bytes(_orig_blob), old_for_diff, st.session_state.tailor_data
+                        )
+                        st.session_state["_last_inplace_docx"] = new_bytes
+                        alert_success("原版回写成功，点下方「确认下载」保存文件")
+                    except Exception as _err:
+                        # DocxRewriteUnsupported 或其它 → 降级
+                        try:
+                            fallback = _build_template_docx(st.session_state.tailor_data)
+                            st.session_state["_last_inplace_docx"] = fallback
+                            alert_warning(
+                                f"原版 DOCX 结构复杂无法回写（{type(_err).__name__}），已降级为内置模板 DOCX"
+                            )
+                        except Exception as _e2:
+                            alert_danger(f"DOCX 生成失败：{_e2}")
+                if st.session_state.get("_last_inplace_docx"):
+                    st.download_button(
+                        "确认下载 DOCX",
+                        data=st.session_state["_last_inplace_docx"],
+                        file_name=f"{_base_name}_原版回写.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        use_container_width=True,
+                        key="dl_docx_inplace_confirm",
+                    )
+            else:
+                st.caption("（需先在主简历页上传 DOCX，才能启用原版回写）")
+
+        with dl_c3:
+            try:
+                _tmpl_docx = _build_template_docx(st.session_state.tailor_data)
+                st.download_button(
+                    "下载 DOCX（内置模板）",
+                    data=_tmpl_docx,
+                    file_name=f"{_base_name}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=True,
+                    key="dl_docx_template",
+                )
+            except Exception as _e:
+                alert_danger(f"DOCX 模板生成失败：{_e}")
 
         # 保存为版本
         st.markdown("---")
@@ -820,3 +1050,5 @@ with tab_preview:
                 conn.close()
                 alert_success(f"已保存：{v_name}")
                 st.rerun()
+
+
