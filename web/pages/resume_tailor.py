@@ -1374,6 +1374,8 @@ def _render_resume_canvas_editor() -> None:
 
 # ═══ 右栏：简历内容 + PDF 预览 + 深度评估 ═══
 with col_right:
+    resume_canvas.render_canvas_css()
+    st.markdown('<div class="cos-right-title">在线简历画布</div>', unsafe_allow_html=True)
     tab_canvas, tab_pdf, tab_deep = st.tabs(["简历内容", "PDF 预览", "深度评估"])
 
 with tab_deep:
@@ -1489,7 +1491,18 @@ with tab_deep:
 
 
 with tab_canvas:
-    alert_info("在线简历画布：右侧内容可直接编辑，PDF / DOCX 会按同一份内容生成。原简历 PDF 只作为参照，不作为编辑源。")
+    _render_resume_canvas_editor()
+
+    st.markdown(
+        """
+        <div class="cos-canvas-note">
+          在线简历画布：右侧内容可直接编辑，PDF / DOCX 会按同一份内容生成。原简历 PDF 只作为参照，不作为编辑源。
+          <span class="muted">没上传过原 PDF：去「主简历 → 上传文件」上传后，这里可以看到原件对照。</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     _orig_pdf = st.session_state.get("uploaded_pdf_bytes")
     if _orig_pdf:
         import base64 as _b64
@@ -1500,11 +1513,6 @@ with tab_canvas:
                 f'width="100%" height="500px" style="border:1px solid rgba(29,29,31,0.08);border-radius:14px"></iframe>',
                 unsafe_allow_html=True,
             )
-    else:
-        st.caption("（没上传过原 PDF · 去「主简历 → 上传文件」上传后，这里可以看到原件对照）")
-
-    st.markdown("##### 在线简历画布")
-    _render_resume_canvas_editor()
 
 with tab_pdf:
     _render_pdf_preview_block(thumbnail=False)

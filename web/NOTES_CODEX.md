@@ -34,3 +34,4 @@
 2026-04-21 10:46 Codex · resume_tailor 方向 A 第二步：手动编辑与 Chat patch 共用 _apply_resume_patch，画布字段支持编辑/保存/取消与 bullet 插入/排序/删除
 2026-04-21 10:57 Codex · resume_tailor 方向 A 第三步：左栏收纳 JD/Chat/历史/PDF缩略/导出/保存，右栏 Tab 改为 简历内容 / PDF 预览 / 深度评估
 2026-04-21 12:21 Codex · resume_tailor 方向 A 审查修复：A4 容器 CSS 精准命中，手动保存只拦截本次新增硬错，bullet 操作压缩为短按钮
+2026-04-21 13:28 Codex · resume_tailor 视觉修正：说明区移到画布下方，A4 内容压紧，画布内编辑按钮强制白底浅交互

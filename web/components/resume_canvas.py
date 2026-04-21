@@ -50,24 +50,24 @@ CANVAS_CSS = """
   .cos-canvas .cv-inline-actions{display:flex;gap:6px;align-items:center;}
   .cos-canvas .cv-bullet-read{font-size:13.5px;line-height:1.55;margin:2px 0;}
   .cos-canvas .cv-muted{color:#6e6e73;}
-  h1.cv-name{font-size:28px;font-weight:600;letter-spacing:-.01em;
-    margin:0 0 6px;text-align:center;color:#1d1d1f;}
-  .cv-contact{text-align:center;color:#6e6e73;font-size:13px;margin-bottom:20px;}
-  h2.cv-section{font-size:15px;font-weight:600;margin:22px 0 10px;
+  h1.cv-name{font-size:23px;font-weight:600;letter-spacing:-.01em;
+    margin:0 0 3px;text-align:center;color:#1d1d1f;line-height:1.18;}
+  .cv-contact{text-align:center;color:#6e6e73;font-size:11px;margin-bottom:12px;line-height:1.35;}
+  h2.cv-section{font-size:13px;font-weight:600;margin:13px 0 6px;
     padding-bottom:4px;border-bottom:1px solid rgba(29,29,31,0.12);letter-spacing:.02em;
     color:#1d1d1f;}
-  .cv-item{position:relative;margin-bottom:10px;}
+  .cv-item{position:relative;margin-bottom:4px;}
   .cv-item-head{display:flex;justify-content:space-between;align-items:baseline;
-    gap:16px;font-size:13.5px;margin-bottom:4px;color:#1d1d1f;}
+    gap:12px;font-size:12px;margin-bottom:1px;color:#1d1d1f;line-height:1.25;}
   .cv-item-title{font-weight:600;}
   .cv-item-role{font-weight:500;color:#1d1d1f;margin-left:8px;}
-  .cv-item-meta{color:#6e6e73;font-size:12px;white-space:nowrap;}
-  .cv-skill-row,.cv-bullet-read,.cv-edu-row{font-size:13.5px;line-height:1.55;color:#1d1d1f;}
-  .cv-skill-row{margin:3px 0;}
+  .cv-item-meta{color:#6e6e73;font-size:10.5px;white-space:nowrap;}
+  .cv-skill-row,.cv-bullet-read,.cv-edu-row{font-size:12px;line-height:1.35;color:#1d1d1f;}
+  .cv-skill-row{margin:1px 0;}
   .cv-skill-label{font-weight:600;margin-right:6px;}
-  .cv-edu-row{display:flex;justify-content:space-between;gap:16px;margin:4px 0;}
+  .cv-edu-row{display:flex;justify-content:space-between;gap:12px;margin:2px 0;}
   .cv-edit-pane{
-    margin:8px 0 14px;padding:10px 12px;border-radius:8px;
+    margin:6px 0 10px;padding:8px 10px;border-radius:8px;
     background:#f5f5f7;border:1px solid rgba(29,29,31,0.08);
   }
   .cos-canvas-anchor{display:none;}
@@ -79,20 +79,54 @@ CANVAS_CSS = """
     box-sizing:border-box !important;
     max-width:820px !important;
     margin:0 auto 32px auto !important;
-    padding:48px 56px !important;
+    padding:26px 34px !important;
   }
   div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] .cos-canvas-anchor) > div > div[data-testid="stVerticalBlock"]{
     width:100% !important;
   }
+  div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] .cos-canvas-anchor) div[data-testid="element-container"]{
+    margin-bottom:0 !important;
+  }
+  div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] .cos-canvas-anchor) .stMarkdown p{
+    margin-bottom:0 !important;
+  }
+  div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] .cos-canvas-anchor) div[data-testid="stHorizontalBlock"]{
+    gap:0.35rem !important;
+  }
   div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] .cos-canvas-anchor) .stButton button{
-    padding:5px 8px !important;
-    min-height:30px !important;
-    font-size:12px !important;
-    border-radius:6px !important;
+    background:#ffffff !important;
+    color:#1d1d1f !important;
+    border:1px solid rgba(29,29,31,0.14) !important;
+    box-shadow:none !important;
+    padding:1px 5px !important;
+    min-height:24px !important;
+    height:24px !important;
+    font-size:11px !important;
+    line-height:1 !important;
+    border-radius:5px !important;
+  }
+  div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] .cos-canvas-anchor) .stButton button:hover,
+  div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] .cos-canvas-anchor) .stButton button:active,
+  div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] .cos-canvas-anchor) .stButton button:focus,
+  div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] .cos-canvas-anchor) .stButton button:focus-visible{
+    background:#f5f7fb !important;
+    color:#1d1d1f !important;
+    border-color:rgba(0,113,227,0.28) !important;
+    box-shadow:0 0 0 2px rgba(0,113,227,0.10) !important;
   }
   div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] .cos-canvas-anchor) textarea,
   div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] .cos-canvas-anchor) input{
-    font-size:13.5px !important;
+    font-size:12px !important;
+  }
+  .cos-canvas-note{
+    max-width:820px;margin:12px auto 24px auto;padding:10px 14px;
+    border-left:3px solid #0071e3;border-radius:7px;
+    background:#f5f9ff;color:#3a3a3c;font-size:12px;line-height:1.45;
+  }
+  .cos-canvas-note .muted{display:block;margin-top:4px;color:#6e6e73;}
+  .cos-right-title{
+    font-size:20px;font-weight:650;letter-spacing:0;color:#1d1d1f;
+    margin:0 0 8px 0;line-height:1.25;
   }
   .cos-preview-thumb img{
     max-width:180px !important;
