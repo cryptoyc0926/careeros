@@ -18,6 +18,34 @@ page_header(
     right_page="pages/home.py",
 )
 
+
+def render_bar_chart(df: pd.DataFrame, x_col: str, y_col: str, empty_text: str) -> None:
+    """Render a compact HTML bar list without invoking Vega charts."""
+    chart_df = df[[x_col, y_col]].copy()
+    chart_df[y_col] = pd.to_numeric(chart_df[y_col], errors="coerce").fillna(0)
+    chart_df = chart_df[chart_df[y_col] > 0]
+    if chart_df.empty:
+        st.caption(empty_text)
+        return
+    max_value = float(chart_df[y_col].max()) or 1.0
+    rows = []
+    for _, row in chart_df.iterrows():
+        label = str(row[x_col] or "未分类")
+        value = float(row[y_col])
+        width = max(4, min(100, round(value / max_value * 100)))
+        value_text = str(int(value)) if value.is_integer() else f"{value:g}"
+        rows.append(
+            f'<div style="display:grid;grid-template-columns:72px 1fr 36px;'
+            f'align-items:center;gap:10px;margin:9px 0;font-family:{FONT_SANS}">'
+            f'<span style="font-size:12px;color:{TEXT_MUTED};white-space:nowrap">{label}</span>'
+            f'<span style="height:10px;background:rgba(0,113,227,0.10);border-radius:99px;overflow:hidden">'
+            f'<span style="display:block;width:{width}%;height:100%;background:{ACCENT_BLUE};border-radius:99px"></span>'
+            f'</span>'
+            f'<span style="font-size:12px;color:{TEXT_STRONG};text-align:right;font-variant-numeric:tabular-nums">{value_text}</span>'
+            f'</div>'
+        )
+    st.markdown("".join(rows), unsafe_allow_html=True)
+
 # ══════════════════════════════════════════════════════════════
 # 核心指标 — 从 jobs_pool (真实数据) + job_descriptions 双源汇总
 # ══════════════════════════════════════════════════════════════
@@ -116,7 +144,7 @@ with left:
         dist = query("SELECT 等级, COUNT(*) AS 数量 FROM jobs_pool WHERE COALESCE(status,'NEW') != '已排除' GROUP BY 等级 ORDER BY 等级")
         if dist:
             df_dist = pd.DataFrame(dist)
-            st.bar_chart(df_dist.set_index("等级")["数量"], color="#0071e3")
+            render_bar_chart(df_dist, "等级", "数量", "暂无数据")
         else:
             st.caption("暂无数据")
     except Exception:
@@ -171,7 +199,7 @@ try:
             elif s >= 60: bins["60-69"] += 1
             else: bins["<60"] += 1
         df_bins = pd.DataFrame({"分数段": list(bins.keys()), "岗位数": list(bins.values())})
-        st.bar_chart(df_bins.set_index("分数段")["岗位数"], color="#0071e3")
+        render_bar_chart(df_bins, "分数段", "岗位数", "暂无评分数据")
     else:
         st.caption("暂无评分数据")
 except Exception:
@@ -200,7 +228,7 @@ try:
                          "portal": "校招门户", "maimai": "脉脉", "wechat": "企业微信"}
             df_ch = pd.DataFrame(channel_stats)
             df_ch["渠道"] = df_ch["apply_channel"].map(lambda x: ch_labels.get(x, x))
-            st.bar_chart(df_ch.set_index("渠道")["total"], color="#0071e3")
+            render_bar_chart(df_ch, "渠道", "total", "暂无渠道数据")
 
         with ch_right:
             apple_section_heading("跟进状态")

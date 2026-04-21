@@ -11,3 +11,4 @@
 2026-04-21 | fix | web/pages/jd_input.py, web/pages/master_resume.py, web/pages/settings_page.py, web/pages/resume_tailor.py | 移除审查命中的按钮和标题 emoji 文案
 2026-04-21 | fix | web/pages/resume_tailor.py | 将 PDF 预览改为点击生成并按简历内容缓存，避免首次打开触发渲染
 2026-04-21 | fix | web/config.py | 安全读取 Streamlit secrets，避免本地缺失 secrets.toml 时暴露绝对路径
+2026-04-21 | fix | web/pages/analytics.py | 用显式 Altair 柱状图和正数数据兜底消除 Vega infinite extent 告警
