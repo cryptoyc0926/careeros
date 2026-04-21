@@ -544,6 +544,293 @@ def _render_chat_panel() -> None:
         st.rerun()
 
 
+def _current_preview_key() -> str:
+    return hashlib.sha256(
+        json.dumps(st.session_state.tailor_data, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+
+
+def _cached_preview() -> tuple[bytes | None, bytes | None, str | None]:
+    preview_key = _current_preview_key()
+    if st.session_state.get("_tailor_preview_key") != preview_key:
+        return None, None, None
+    return (
+        st.session_state.get("_tailor_preview_pdf"),
+        st.session_state.get("_tailor_preview_png"),
+        st.session_state.get("_tailor_preview_error"),
+    )
+
+
+def _ensure_preview(force: bool = False) -> tuple[bytes | None, bytes | None, str | None]:
+    if not force:
+        pdf_bytes, png_bytes, preview_error = _cached_preview()
+        if pdf_bytes is not None or preview_error:
+            return pdf_bytes, png_bytes, preview_error
+    preview_key = _current_preview_key()
+    try:
+        with st.spinner("正在生成 PDF 预览..."):
+            pdf_bytes = resume_renderer.render_pdf_bytes(st.session_state.tailor_data)
+            png_bytes, backend = resume_renderer.render_preview_png(
+                st.session_state.tailor_data,
+                pdf_bytes=pdf_bytes,
+            )
+        st.session_state["_tailor_preview_key"] = preview_key
+        st.session_state["_tailor_preview_pdf"] = pdf_bytes
+        st.session_state["_tailor_preview_png"] = png_bytes
+        st.session_state["_tailor_preview_backend"] = backend
+        st.session_state["_tailor_preview_error"] = None
+        return pdf_bytes, png_bytes, None
+    except Exception as e:
+        preview_error = str(e)
+        st.session_state["_tailor_preview_key"] = preview_key
+        st.session_state["_tailor_preview_pdf"] = None
+        st.session_state["_tailor_preview_png"] = None
+        st.session_state["_tailor_preview_backend"] = None
+        st.session_state["_tailor_preview_error"] = preview_error
+        return None, None, preview_error
+
+
+def _build_template_docx(tdata: dict) -> bytes:
+    from docx import Document
+    import io as _io
+    import re as _re
+
+    doc = Document()
+    b = tdata.get("basics", {})
+    doc.add_heading(b.get("name") or "简历", level=0)
+    contact = " · ".join(
+        x for x in [b.get("phone"), b.get("email"), b.get("city"), b.get("target_role")] if x
+    )
+    if contact:
+        doc.add_paragraph(contact)
+
+    def _add_rich(p, text: str):
+        parts = _re.split(r"(<b>.*?</b>)", text or "", flags=_re.IGNORECASE | _re.DOTALL)
+        for part in parts:
+            if not part:
+                continue
+            m = _re.match(r"<b>(.*?)</b>", part, flags=_re.IGNORECASE | _re.DOTALL)
+            if m:
+                r = p.add_run(m.group(1))
+                r.bold = True
+            else:
+                p.add_run(_re.sub(r"<[^>]+>", "", part))
+
+    prof = tdata.get("profile")
+    if isinstance(prof, dict):
+        pool = prof.get("pool") or []
+        default_id = prof.get("default")
+        prof = next(
+            (x.get("text", "") for x in pool if x.get("id") == default_id),
+            (pool[0].get("text", "") if pool else ""),
+        )
+    if prof:
+        doc.add_heading("个人总结", level=1)
+        _add_rich(doc.add_paragraph(), prof)
+
+    for sec, title in (("projects", "项目经历"), ("internships", "实习经历")):
+        items = tdata.get(sec) or []
+        if not items:
+            continue
+        doc.add_heading(title, level=1)
+        for it in items:
+            head = f"{it.get('company','')} — {it.get('role','')} · {it.get('date','')}"
+            p = doc.add_paragraph()
+            r = p.add_run(head)
+            r.bold = True
+            for bu in (it.get("bullets") or []):
+                pb = doc.add_paragraph(style="List Bullet")
+                _add_rich(pb, bu)
+
+    skills = tdata.get("skills") or []
+    if skills:
+        doc.add_heading("技能证书", level=1)
+        for s in skills:
+            p = doc.add_paragraph()
+            r = p.add_run(f"{s.get('label','')}：")
+            r.bold = True
+            p.add_run(s.get("text", ""))
+
+    edu = tdata.get("education") or []
+    if edu:
+        doc.add_heading("教育背景", level=1)
+        for e in edu:
+            school = e.get("school") or e.get("company") or ""
+            major = e.get("major") or e.get("role") or ""
+            date = e.get("date", "")
+            p = doc.add_paragraph()
+            r = p.add_run(f"{school} · {major} · {date}")
+            r.bold = True
+            for bu in (e.get("bullets") or []):
+                pb = doc.add_paragraph(style="List Bullet")
+                _add_rich(pb, bu)
+
+    buf = _io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def _render_save_version() -> None:
+    v_name = st.text_input("版本命名", value="", placeholder="如：MiniMax-增长", key="tailor_version_name")
+    if st.button("保存此版本", use_container_width=True):
+        if not v_name.strip():
+            alert_warning("请输入版本名")
+            return
+        conn = sqlite3.connect(DB_PATH)
+        if _has_db_column("resume_versions", "chat_transcript_json"):
+            conn.execute(
+                """INSERT INTO resume_versions
+                   (master_id, target_role, version_name, content_json, match_score, chat_transcript_json)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (
+                    master["id"],
+                    st.session_state.tailor_data["basics"].get("target_role"),
+                    v_name.strip(),
+                    json.dumps(st.session_state.tailor_data, ensure_ascii=False),
+                    st.session_state.tailor_meta.get("match_score", 0),
+                    _chat_transcript_payload(),
+                ),
+            )
+        else:
+            conn.execute(
+                """INSERT INTO resume_versions
+                   (master_id, target_role, version_name, content_json, match_score)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (
+                    master["id"],
+                    st.session_state.tailor_data["basics"].get("target_role"),
+                    v_name.strip(),
+                    json.dumps(st.session_state.tailor_data, ensure_ascii=False),
+                    st.session_state.tailor_meta.get("match_score", 0),
+                ),
+            )
+        conn.commit()
+        conn.close()
+        alert_success(f"已保存：{v_name}")
+        st.rerun()
+
+
+def _render_history_versions() -> None:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    versions = conn.execute(
+        """SELECT id, version_name, target_role, match_score, created_at
+           FROM resume_versions ORDER BY created_at DESC LIMIT 10"""
+    ).fetchall()
+    conn.close()
+    if not versions:
+        st.caption("暂无")
+        return
+    for v in versions:
+        if st.button(
+            f"#{v['id']} {v['version_name']} · {v['match_score']}分",
+            key=f"v_{v['id']}",
+            use_container_width=True,
+        ):
+            conn = sqlite3.connect(DB_PATH)
+            conn.row_factory = sqlite3.Row
+            has_chat_col = _has_db_column("resume_versions", "chat_transcript_json")
+            select_cols = "content_json, chat_transcript_json" if has_chat_col else "content_json"
+            row = conn.execute(
+                f"SELECT {select_cols} FROM resume_versions WHERE id = ?",
+                (v["id"],),
+            ).fetchone()
+            conn.close()
+            st.session_state.tailor_data = json.loads(row["content_json"])
+            _restore_chat_transcript(row["chat_transcript_json"] if has_chat_col else None)
+            st.session_state.tailor_undo_stack = []
+            st.session_state.tailor_meta = {}
+            _clear_tailor_preview_cache()
+            st.rerun()
+
+
+def _render_pdf_preview_block(*, thumbnail: bool) -> None:
+    if st.button("生成预览", key="generate_preview_left" if thumbnail else "generate_preview_full",
+                 use_container_width=True):
+        _ensure_preview(force=True)
+    pdf_bytes, png_bytes, preview_error = _cached_preview()
+    if preview_error:
+        alert_danger(f"预览渲染失败：{preview_error}")
+    elif png_bytes:
+        if thumbnail:
+            st.markdown('<div class="cos-preview-thumb">', unsafe_allow_html=True)
+            st.image(png_bytes, width=180)
+            st.markdown("</div>", unsafe_allow_html=True)
+        else:
+            st.image(png_bytes, width=650)
+    elif pdf_bytes and not png_bytes:
+        import base64 as _b64p
+        _b64_pdf = _b64p.b64encode(pdf_bytes).decode()
+        st.markdown(
+            f'<iframe src="data:application/pdf;base64,{_b64_pdf}" '
+            f'width="100%" height="640px" '
+            f'style="border:1px solid rgba(29,29,31,0.08);border-radius:14px"></iframe>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.caption("生成预览后显示缩略图" if thumbnail else "生成预览后显示 PDF 大图")
+
+
+def _render_export_controls() -> None:
+    pdf_bytes, _png_bytes, _preview_error = _cached_preview()
+    base_name = (
+        f"{st.session_state.tailor_data['basics'].get('name', 'resume')}_简历_"
+        f"{st.session_state.tailor_data['basics'].get('target_role', '定制版')}"
+    )
+    st.download_button(
+        "PDF",
+        data=pdf_bytes or b"",
+        file_name=f"{base_name}.pdf",
+        mime="application/pdf",
+        use_container_width=True,
+        disabled=pdf_bytes is None,
+        type="primary",
+    )
+
+    orig_blob = master.get("original_docx_blob")
+    if orig_blob:
+        if st.button("DOCX回写", key="dl_docx_inplace", use_container_width=True):
+            try:
+                from services.resume_docx_writer import rewrite_docx
+                old_for_diff = flatten_master_for_render(master)
+                new_bytes = rewrite_docx(
+                    bytes(orig_blob), old_for_diff, st.session_state.tailor_data
+                )
+                st.session_state["_last_inplace_docx"] = new_bytes
+                alert_success("原版回写成功，点下方确认下载")
+            except Exception as err:
+                try:
+                    fallback = _build_template_docx(st.session_state.tailor_data)
+                    st.session_state["_last_inplace_docx"] = fallback
+                    alert_warning(f"原版 DOCX 无法回写（{type(err).__name__}），已降级为模板 DOCX")
+                except Exception as fallback_err:
+                    alert_danger(f"DOCX 生成失败：{fallback_err}")
+        if st.session_state.get("_last_inplace_docx"):
+            st.download_button(
+                "确认下载DOCX",
+                data=st.session_state["_last_inplace_docx"],
+                file_name=f"{base_name}_原版回写.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True,
+                key="dl_docx_inplace_confirm",
+            )
+    else:
+        st.caption("未上传 DOCX，原版回写不可用")
+
+    try:
+        tmpl_docx = _build_template_docx(st.session_state.tailor_data)
+        st.download_button(
+            "DOCX模板",
+            data=tmpl_docx,
+            file_name=f"{base_name}.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            use_container_width=True,
+            key="dl_docx_template",
+        )
+    except Exception as e:
+        alert_danger(f"DOCX 模板生成失败：{e}")
+
+
 # ── 布局：两栏（左 JD+Chat / 右 预览+评估）──────────────
 col_left, col_right = st.columns([0.9, 2.4])
 
@@ -732,40 +1019,18 @@ with col_left:
         st.caption("整体重写 / 段落重写 / 精细 patch / 建议 / 反问")
         _render_chat_panel()
 
-    # 历史版本（chat 下方）
     st.markdown("---")
-    st.markdown("##### 历史版本")
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    versions = conn.execute(
-        """SELECT id, version_name, target_role, match_score, created_at
-           FROM resume_versions ORDER BY created_at DESC LIMIT 10"""
-    ).fetchall()
-    conn.close()
-    if not versions:
-        st.caption("暂无")
-    else:
-        for v in versions:
-            if st.button(
-                f"#{v['id']} {v['version_name']} · {v['match_score']}分",
-                key=f"v_{v['id']}",
-                use_container_width=True,
-            ):
-                conn = sqlite3.connect(DB_PATH)
-                conn.row_factory = sqlite3.Row
-                has_chat_col = _has_db_column("resume_versions", "chat_transcript_json")
-                select_cols = "content_json, chat_transcript_json" if has_chat_col else "content_json"
-                row = conn.execute(
-                    f"SELECT {select_cols} FROM resume_versions WHERE id = ?",
-                    (v["id"],),
-                ).fetchone()
-                conn.close()
-                st.session_state.tailor_data = json.loads(row["content_json"])
-                _restore_chat_transcript(row["chat_transcript_json"] if has_chat_col else None)
-                st.session_state.tailor_undo_stack = []
-                st.session_state.tailor_meta = {}
-                _clear_tailor_preview_cache()
-                st.rerun()
+    with st.expander("历史版本", expanded=False):
+        _render_history_versions()
+
+    st.markdown("---")
+    st.markdown("##### PDF 预览")
+    _render_pdf_preview_block(thumbnail=True)
+
+    st.markdown("---")
+    st.markdown("##### 导出")
+    _render_export_controls()
+    _render_save_version()
 
 
 def _path_state_key(prefix: str, path: str) -> str:
@@ -1067,11 +1332,11 @@ def _render_resume_canvas_editor() -> None:
         _render_education_canvas()
 
 
-# ═══ 右栏：实时预览 + 深度评估 ═══
+# ═══ 右栏：简历内容 + PDF 预览 + 深度评估 ═══
 with col_right:
-    tab_preview, tab_eval = st.tabs(["实时预览", "深度评估"])
+    tab_canvas, tab_pdf, tab_deep = st.tabs(["简历内容", "PDF 预览", "深度评估"])
 
-with tab_eval:
+with tab_deep:
     from services import resume_evaluator
     if "eval_data" not in st.session_state:
         st.session_state.eval_data = None
@@ -1183,14 +1448,8 @@ with tab_eval:
         st.caption("先在左栏输入 JD 并生成定制版，再点「深度评估」")
 
 
-with tab_preview:
-    # ── 诚实提示：新 PDF 不是原件排版 ─────────────────────────
-    alert_info(
-        "**在线简历画布**：右侧内容可直接编辑，PDF / DOCX 会按同一份内容生成。"
-        "原简历 PDF 只作为参照，不作为编辑源。"
-    )
-
-    # ── 原 PDF（来自主简历页上传的 session_state）─────────────
+with tab_canvas:
+    alert_info("在线简历画布：右侧内容可直接编辑，PDF / DOCX 会按同一份内容生成。原简历 PDF 只作为参照，不作为编辑源。")
     _orig_pdf = st.session_state.get("uploaded_pdf_bytes")
     if _orig_pdf:
         import base64 as _b64
@@ -1204,235 +1463,8 @@ with tab_preview:
     else:
         st.caption("（没上传过原 PDF · 去「主简历 → 上传文件」上传后，这里可以看到原件对照）")
 
-    # ── 可编辑简历（主编辑区）──────────────────────────
     st.markdown("##### 在线简历画布")
     _render_resume_canvas_editor()
 
-    st.markdown("---")
-    st.markdown("##### 导出文件")
-
-    preview_key = hashlib.sha256(
-        json.dumps(st.session_state.tailor_data, ensure_ascii=False, sort_keys=True).encode("utf-8")
-    ).hexdigest()
-    cached_key = st.session_state.get("_tailor_preview_key")
-    cache_valid = cached_key == preview_key
-    pdf_bytes = st.session_state.get("_tailor_preview_pdf") if cache_valid else None
-    png_bytes = st.session_state.get("_tailor_preview_png") if cache_valid else None
-    preview_error = st.session_state.get("_tailor_preview_error") if cache_valid else None
-
-    if not cache_valid or (pdf_bytes is None and not preview_error):
-        try:
-            with st.spinner("正在刷新 PDF 预览..."):
-                pdf_bytes = resume_renderer.render_pdf_bytes(st.session_state.tailor_data)
-                png_bytes, _backend = resume_renderer.render_preview_png(
-                    st.session_state.tailor_data,
-                    pdf_bytes=pdf_bytes,
-                )
-            st.session_state["_tailor_preview_key"] = preview_key
-            st.session_state["_tailor_preview_pdf"] = pdf_bytes
-            st.session_state["_tailor_preview_png"] = png_bytes
-            st.session_state["_tailor_preview_backend"] = _backend
-            st.session_state["_tailor_preview_error"] = None
-            preview_error = None
-        except Exception as e:
-            pdf_bytes = None
-            png_bytes = None
-            preview_error = str(e)
-            st.session_state["_tailor_preview_key"] = preview_key
-            st.session_state["_tailor_preview_pdf"] = None
-            st.session_state["_tailor_preview_png"] = None
-            st.session_state["_tailor_preview_backend"] = None
-            st.session_state["_tailor_preview_error"] = preview_error
-
-    if preview_error:
-        alert_danger(f"预览渲染失败：{preview_error}")
-    elif pdf_bytes is None:
-        st.caption("等待可渲染的简历内容。")
-    else:
-        with st.expander("PDF 导出预览", expanded=False):
-            # 三级降级预览：PyMuPDF → pdf2image → iframe
-            if png_bytes:
-                st.image(png_bytes, width=650)
-            else:
-                # 最终降级：直接嵌 PDF iframe
-                import base64 as _b64p
-                _b64_pdf = _b64p.b64encode(pdf_bytes).decode()
-                st.markdown(
-                    f'<iframe src="data:application/pdf;base64,{_b64_pdf}" '
-                    f'width="100%" height="640px" '
-                    f'style="border:1px solid rgba(29,29,31,0.08);border-radius:14px"></iframe>',
-                    unsafe_allow_html=True,
-                )
-                st.caption("（PNG 预览依赖不可用，已改为浏览器内嵌 PDF 视图）")
-
-        # ── 三个下载入口 ───────────────────────────────
-        _base_name = f"{st.session_state.tailor_data['basics'].get('name', 'resume')}_简历_{st.session_state.tailor_data['basics'].get('target_role', '定制版')}"
-        dl_c1, dl_c2, dl_c3 = st.columns(3)
-        with dl_c1:
-            st.download_button(
-                "下载 PDF（内置模板）",
-                data=pdf_bytes,
-                file_name=f"{_base_name}.pdf",
-                mime="application/pdf",
-                use_container_width=True,
-                type="primary",
-            )
-
-        # 内置模板 DOCX（简洁重新渲染，不保持原样）
-        def _build_template_docx(tdata: dict) -> bytes:
-            from docx import Document
-            from docx.shared import Pt
-            import io as _io, re as _re
-            doc = Document()
-            b = tdata.get("basics", {})
-            h = doc.add_heading(b.get("name") or "简历", level=0)
-            contact = " · ".join(x for x in [b.get("phone"), b.get("email"), b.get("city"), b.get("target_role")] if x)
-            if contact:
-                doc.add_paragraph(contact)
-
-            def _add_rich(p, text: str):
-                # 渲染 <b>...</b>
-                parts = _re.split(r"(<b>.*?</b>)", text or "", flags=_re.IGNORECASE | _re.DOTALL)
-                for part in parts:
-                    if not part:
-                        continue
-                    m = _re.match(r"<b>(.*?)</b>", part, flags=_re.IGNORECASE | _re.DOTALL)
-                    if m:
-                        r = p.add_run(m.group(1)); r.bold = True
-                    else:
-                        p.add_run(_re.sub(r"<[^>]+>", "", part))
-
-            prof = tdata.get("profile")
-            if isinstance(prof, dict):
-                pool = prof.get("pool") or []
-                default_id = prof.get("default")
-                prof = next((x.get("text","") for x in pool if x.get("id")==default_id), (pool[0].get("text","") if pool else ""))
-            if prof:
-                doc.add_heading("个人总结", level=1)
-                _add_rich(doc.add_paragraph(), prof)
-
-            for sec, title in (("projects", "项目经历"), ("internships", "实习经历")):
-                items = tdata.get(sec) or []
-                if not items:
-                    continue
-                doc.add_heading(title, level=1)
-                for it in items:
-                    head = f"{it.get('company','')} — {it.get('role','')} · {it.get('date','')}"
-                    p = doc.add_paragraph()
-                    r = p.add_run(head); r.bold = True
-                    for bu in (it.get("bullets") or []):
-                        pb = doc.add_paragraph(style="List Bullet")
-                        _add_rich(pb, bu)
-
-            skills = tdata.get("skills") or []
-            if skills:
-                doc.add_heading("技能证书", level=1)
-                for s in skills:
-                    p = doc.add_paragraph()
-                    r = p.add_run(f"{s.get('label','')}："); r.bold = True
-                    p.add_run(s.get("text",""))
-
-            edu = tdata.get("education") or []
-            if edu:
-                doc.add_heading("教育背景", level=1)
-                for e in edu:
-                    school = e.get("school") or e.get("company") or ""
-                    major = e.get("major") or e.get("role") or ""
-                    date = e.get("date","")
-                    p = doc.add_paragraph()
-                    r = p.add_run(f"{school} · {major} · {date}"); r.bold = True
-                    for bu in (e.get("bullets") or []):
-                        pb = doc.add_paragraph(style="List Bullet")
-                        _add_rich(pb, bu)
-
-            buf = _io.BytesIO(); doc.save(buf); return buf.getvalue()
-
-        with dl_c2:
-            # 原版回写 DOCX（只有上传过 DOCX 才显示）
-            _orig_blob = master.get("original_docx_blob")
-            if _orig_blob:
-                if st.button("下载 DOCX（原版回写）", key="dl_docx_inplace",
-                             use_container_width=True):
-                    try:
-                        from services.resume_docx_writer import rewrite_docx, DocxRewriteUnsupported
-                        old_for_diff = flatten_master_for_render(master)
-                        new_bytes = rewrite_docx(
-                            bytes(_orig_blob), old_for_diff, st.session_state.tailor_data
-                        )
-                        st.session_state["_last_inplace_docx"] = new_bytes
-                        alert_success("原版回写成功，点下方「确认下载」保存文件")
-                    except Exception as _err:
-                        # DocxRewriteUnsupported 或其它 → 降级
-                        try:
-                            fallback = _build_template_docx(st.session_state.tailor_data)
-                            st.session_state["_last_inplace_docx"] = fallback
-                            alert_warning(
-                                f"原版 DOCX 结构复杂无法回写（{type(_err).__name__}），已降级为内置模板 DOCX"
-                            )
-                        except Exception as _e2:
-                            alert_danger(f"DOCX 生成失败：{_e2}")
-                if st.session_state.get("_last_inplace_docx"):
-                    st.download_button(
-                        "确认下载 DOCX",
-                        data=st.session_state["_last_inplace_docx"],
-                        file_name=f"{_base_name}_原版回写.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        use_container_width=True,
-                        key="dl_docx_inplace_confirm",
-                    )
-            else:
-                st.caption("（需先在主简历页上传 DOCX，才能启用原版回写）")
-
-        with dl_c3:
-            try:
-                _tmpl_docx = _build_template_docx(st.session_state.tailor_data)
-                st.download_button(
-                    "下载 DOCX（内置模板）",
-                    data=_tmpl_docx,
-                    file_name=f"{_base_name}.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    use_container_width=True,
-                    key="dl_docx_template",
-                )
-            except Exception as _e:
-                alert_danger(f"DOCX 模板生成失败：{_e}")
-
-        # 保存为版本
-        st.markdown("---")
-        v_name = st.text_input("版本命名", value="", placeholder="如：MiniMax-增长")
-        if st.button("保存此版本", use_container_width=True):
-            if not v_name.strip():
-                alert_warning("请输入版本名")
-            else:
-                conn = sqlite3.connect(DB_PATH)
-                if _has_db_column("resume_versions", "chat_transcript_json"):
-                    conn.execute(
-                        """INSERT INTO resume_versions
-                           (master_id, target_role, version_name, content_json, match_score, chat_transcript_json)
-                           VALUES (?, ?, ?, ?, ?, ?)""",
-                        (
-                            master["id"],
-                            st.session_state.tailor_data["basics"].get("target_role"),
-                            v_name.strip(),
-                            json.dumps(st.session_state.tailor_data, ensure_ascii=False),
-                            st.session_state.tailor_meta.get("match_score", 0),
-                            _chat_transcript_payload(),
-                        ),
-                    )
-                else:
-                    conn.execute(
-                        """INSERT INTO resume_versions
-                           (master_id, target_role, version_name, content_json, match_score)
-                           VALUES (?, ?, ?, ?, ?)""",
-                        (
-                            master["id"],
-                            st.session_state.tailor_data["basics"].get("target_role"),
-                            v_name.strip(),
-                            json.dumps(st.session_state.tailor_data, ensure_ascii=False),
-                            st.session_state.tailor_meta.get("match_score", 0),
-                        ),
-                    )
-                conn.commit()
-                conn.close()
-                alert_success(f"已保存：{v_name}")
-                st.rerun()
+with tab_pdf:
+    _render_pdf_preview_block(thumbnail=False)
