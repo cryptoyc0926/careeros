@@ -35,3 +35,4 @@
 2026-04-21 10:57 Codex · resume_tailor 方向 A 第三步：左栏收纳 JD/Chat/历史/PDF缩略/导出/保存，右栏 Tab 改为 简历内容 / PDF 预览 / 深度评估
 2026-04-21 12:21 Codex · resume_tailor 方向 A 审查修复：A4 容器 CSS 精准命中，手动保存只拦截本次新增硬错，bullet 操作压缩为短按钮
 2026-04-21 13:28 Codex · resume_tailor 视觉修正：说明区移到画布下方，A4 内容压紧，画布内编辑按钮强制白底浅交互
+2026-04-21 14:31 Codex · resume_tailor 紧凑修正：页头改薄、隐藏空 style/marker 间距、基本信息编辑移出画布、bullet 结构操作可用且错误全宽显示

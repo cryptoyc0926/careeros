@@ -50,20 +50,20 @@ CANVAS_CSS = """
   .cos-canvas .cv-inline-actions{display:flex;gap:6px;align-items:center;}
   .cos-canvas .cv-bullet-read{font-size:13.5px;line-height:1.55;margin:2px 0;}
   .cos-canvas .cv-muted{color:#6e6e73;}
-  h1.cv-name{font-size:23px;font-weight:600;letter-spacing:-.01em;
-    margin:0 0 3px;text-align:center;color:#1d1d1f;line-height:1.18;}
-  .cv-contact{text-align:center;color:#6e6e73;font-size:11px;margin-bottom:12px;line-height:1.35;}
-  h2.cv-section{font-size:13px;font-weight:600;margin:13px 0 6px;
-    padding-bottom:4px;border-bottom:1px solid rgba(29,29,31,0.12);letter-spacing:.02em;
+  h1.cv-name{font-size:18px;font-weight:600;letter-spacing:-.01em;
+    margin:0 0 2px;text-align:center;color:#1d1d1f;line-height:1.14;}
+  .cv-contact{text-align:center;color:#6e6e73;font-size:8.8px;margin-bottom:5px;line-height:1.18;}
+  h2.cv-section{font-size:10.5px;font-weight:600;margin:7px 0 3px;
+    padding-bottom:3px;border-bottom:1px solid rgba(29,29,31,0.12);letter-spacing:.02em;
     color:#1d1d1f;}
-  .cv-item{position:relative;margin-bottom:4px;}
+  .cv-item{position:relative;margin-bottom:1px;}
   .cv-item-head{display:flex;justify-content:space-between;align-items:baseline;
-    gap:12px;font-size:12px;margin-bottom:1px;color:#1d1d1f;line-height:1.25;}
+    gap:8px;font-size:9.8px;margin-bottom:0;color:#1d1d1f;line-height:1.12;}
   .cv-item-title{font-weight:600;}
   .cv-item-role{font-weight:500;color:#1d1d1f;margin-left:8px;}
-  .cv-item-meta{color:#6e6e73;font-size:10.5px;white-space:nowrap;}
-  .cv-skill-row,.cv-bullet-read,.cv-edu-row{font-size:12px;line-height:1.35;color:#1d1d1f;}
-  .cv-skill-row{margin:1px 0;}
+  .cv-item-meta{color:#6e6e73;font-size:8.8px;white-space:nowrap;}
+  .cv-skill-row,.cv-bullet-read,.cv-edu-row{font-size:9.4px;line-height:1.16;color:#1d1d1f;}
+  .cv-skill-row{margin:0;}
   .cv-skill-label{font-weight:600;margin-right:6px;}
   .cv-edu-row{display:flex;justify-content:space-between;gap:12px;margin:2px 0;}
   .cv-edit-pane{
@@ -71,6 +71,12 @@ CANVAS_CSS = """
     background:#f5f5f7;border:1px solid rgba(29,29,31,0.08);
   }
   .cos-canvas-anchor{display:none;}
+  div[data-testid="element-container"]:has(.cos-canvas-anchor){
+    display:none !important;
+    height:0 !important;
+    margin:0 !important;
+    padding:0 !important;
+  }
   div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] .cos-canvas-anchor){
     background:#ffffff !important;
     border:1px solid rgba(29,29,31,0.08) !important;
@@ -79,7 +85,7 @@ CANVAS_CSS = """
     box-sizing:border-box !important;
     max-width:820px !important;
     margin:0 auto 32px auto !important;
-    padding:26px 34px !important;
+    padding:10px 18px !important;
   }
   div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] .cos-canvas-anchor) > div > div[data-testid="stVerticalBlock"]{
     width:100% !important;
@@ -91,17 +97,17 @@ CANVAS_CSS = """
     margin-bottom:0 !important;
   }
   div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] .cos-canvas-anchor) div[data-testid="stHorizontalBlock"]{
-    gap:0.35rem !important;
+    gap:0.25rem !important;
   }
   div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] .cos-canvas-anchor) .stButton button{
     background:#ffffff !important;
     color:#1d1d1f !important;
     border:1px solid rgba(29,29,31,0.14) !important;
     box-shadow:none !important;
-    padding:1px 5px !important;
-    min-height:24px !important;
-    height:24px !important;
-    font-size:11px !important;
+    padding:0 4px !important;
+    min-height:18px !important;
+    height:18px !important;
+    font-size:9px !important;
     line-height:1 !important;
     border-radius:5px !important;
   }
@@ -119,14 +125,20 @@ CANVAS_CSS = """
     font-size:12px !important;
   }
   .cos-canvas-note{
-    max-width:820px;margin:12px auto 24px auto;padding:10px 14px;
+    max-width:820px;margin:8px auto 16px auto;padding:8px 12px;
     border-left:3px solid #0071e3;border-radius:7px;
     background:#f5f9ff;color:#3a3a3c;font-size:12px;line-height:1.45;
   }
   .cos-canvas-note .muted{display:block;margin-top:4px;color:#6e6e73;}
-  .cos-right-title{
+  .cos-left-title,.cos-right-title{
     font-size:20px;font-weight:650;letter-spacing:0;color:#1d1d1f;
     margin:0 0 8px 0;line-height:1.25;
+  }
+  .cos-canvas-error{
+    max-width:820px;margin:0 auto 10px auto;padding:10px 12px;
+    border-left:3px solid #d92d20;border-radius:7px;
+    background:#fff2f1;color:#3a3a3c;font-size:12px;line-height:1.45;
+    white-space:pre-wrap;overflow-wrap:anywhere;
   }
   .cos-preview-thumb img{
     max-width:180px !important;

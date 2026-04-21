@@ -25,11 +25,16 @@ from config import settings
 from services import resume_renderer, resume_tailor
 from services.ai_engine import AIError
 from components import resume_canvas
-from components.ui import page_header, section_title, divider, score_hero_card, alert_success, alert_info, alert_warning, alert_danger
+from components.ui import section_title, divider, score_hero_card, alert_success, alert_info, alert_warning, alert_danger
 
 DB_PATH = settings.db_full_path
 
-page_header("简历定制 & 在线编辑")
+st.markdown(
+    '<div style="font-size:26px;font-weight:650;line-height:1.12;margin:0 0 8px 0;color:#1d1d1f;">'
+    '简历定制 & 在线编辑'
+    '</div>',
+    unsafe_allow_html=True,
+)
 # 压缩顶部留白
 st.markdown(
     """
@@ -37,13 +42,23 @@ st.markdown(
     div.block-container,
     .main .block-container,
     [data-testid="stMainBlockContainer"]{
-      padding-top:1.2rem !important;
+      padding-top:0.55rem !important;
       max-width:1500px !important;
+    }
+    [data-testid="stMainBlockContainer"] hr{
+      margin:0.35rem 0 0.8rem 0 !important;
+    }
+    div[data-testid="element-container"]:has(style){
+      display:none !important;
+      height:0 !important;
+      margin:0 !important;
+      padding:0 !important;
     }
     </style>
     """,
     unsafe_allow_html=True,
 )
+resume_canvas.render_canvas_css()
 
 if not settings.has_anthropic_key:
     alert_danger("Claude API Key 未配置，请前往 **设置** 页面。")
@@ -346,12 +361,30 @@ from services import resume_chat as _resume_chat_service  # noqa: E402
 from services import resume_patch as _resume_patch_mod  # noqa: E402
 
 
-def _apply_resume_patch(patch: list[dict], label: str) -> bool:
+def _set_canvas_error(message: str) -> None:
+    st.session_state["_tailor_canvas_error"] = message
+
+
+def _clear_canvas_error() -> None:
+    st.session_state.pop("_tailor_canvas_error", None)
+
+
+def _format_patch_errors(errors: list[str]) -> str:
+    return "Patch 应用失败：\n" + "\n".join(f"- {e}" for e in errors)
+
+
+def _apply_resume_patch(patch: list[dict], label: str, *, validate: bool = True) -> bool:
     """Apply manual/chat edits through the same patch + validation + undo path."""
     new_data, errors = _resume_patch_mod.apply_patch(st.session_state.tailor_data, patch)
     if errors:
-        alert_danger("Patch 应用失败：\n" + "\n".join(errors))
+        _set_canvas_error(_format_patch_errors(errors))
         return False
+    if not validate:
+        _push_undo_snapshot(label=label)
+        st.session_state.tailor_data = new_data
+        _clear_tailor_preview_cache()
+        _clear_canvas_error()
+        return True
     from services.resume_validator import validate_tailored
     current_report = None
     try:
@@ -389,7 +422,7 @@ def _apply_resume_patch(patch: list[dict], label: str) -> bool:
     ]
 
     if new_hard_errors:
-        alert_danger(
+        _set_canvas_error(
             f"硬规则校验失败（新增 {len(new_hard_errors)} 条），拒绝应用：\n"
             + "\n".join(
                 f"- [{_issue_value(e, 'rule')}] {_issue_value(e, 'location')}: {_issue_value(e, 'message')}"
@@ -400,6 +433,7 @@ def _apply_resume_patch(patch: list[dict], label: str) -> bool:
     _push_undo_snapshot(label=label)
     st.session_state.tailor_data = new_data
     _clear_tailor_preview_cache()
+    _clear_canvas_error()
     return True
 
 
@@ -528,6 +562,8 @@ def _render_chat_panel() -> None:
                             break
                     st.session_state.tailor_chat["pending"] = None
                     alert_success("已应用，预览可刷新查看")
+                    st.rerun()
+                else:
                     st.rerun()
         with pcol_b:
             if st.button("取消", key="tailor_patch_cancel",
@@ -876,7 +912,7 @@ col_left, col_right = st.columns([0.9, 2.4])
 
 # ═══ 左栏：JD 输入 + 历史版本 ═══
 with col_left:
-    st.markdown("##### 目标 JD")
+    st.markdown('<div class="cos-left-title">目标 JD</div>', unsafe_allow_html=True)
 
     # 岗位池下拉 —— 关联 job_descriptions，有 JD 的自动带入
     conn = sqlite3.connect(DB_PATH)
@@ -1103,6 +1139,7 @@ def _render_edit_pane(path: str, current_value: object, *, height: int = 90, lab
             ):
                 _close_inline_edit(path)
                 st.rerun()
+            st.rerun()
     with cancel_col:
         if st.button("取消", key=_path_state_key("cancel", path), use_container_width=True):
             _close_inline_edit(path)
@@ -1154,6 +1191,7 @@ def _render_basics_editor(data: dict) -> None:
                 ]
                 if _apply_resume_patch(patch, label="手动编辑基本信息"):
                     st.rerun()
+                st.rerun()
         with cancel_col:
             if st.button("取消基本信息编辑", key="cancel_basics_canvas", use_container_width=True):
                 for field, _label in fields:
@@ -1171,16 +1209,21 @@ def _apply_bullet_action(section_key: str, item_idx: int, bullet_idx: int, actio
     list_path = _bullet_list_path(section_key, item_idx)
     if action == "insert":
         insert_path = f"{list_path}[{bullet_idx + 1}]"
-        if _apply_resume_patch([{"op": "add", "path": insert_path, "value": ""}], label="插入 bullet"):
+        if _apply_resume_patch(
+            [{"op": "add", "path": insert_path, "value": ""}],
+            label="插入 bullet",
+            validate=False,
+        ):
             _open_inline_edit(insert_path, "")
             st.rerun()
     elif action == "delete":
         if len(bullets) <= 1:
-            alert_warning("至少保留 1 条 bullet")
-            return
+            _set_canvas_error("至少保留 1 条 bullet")
+            st.rerun()
         if _apply_resume_patch(
             [{"op": "remove", "path": f"{list_path}[{bullet_idx}]"}],
             label="删除 bullet",
+            validate=False,
         ):
             st.rerun()
     elif action in ("up", "down"):
@@ -1192,6 +1235,7 @@ def _apply_bullet_action(section_key: str, item_idx: int, bullet_idx: int, actio
         if _apply_resume_patch(
             [{"op": "reorder", "path": list_path, "value": order}],
             label="调整 bullet 顺序",
+            validate=False,
         ):
             st.rerun()
 
@@ -1287,6 +1331,7 @@ def _render_skills_canvas() -> None:
                         _close_inline_edit(label_path)
                         _close_inline_edit(text_path)
                         st.rerun()
+                    st.rerun()
             with cancel_col:
                 if st.button("取消", key=f"cancel_skill_{skill_idx}", use_container_width=True):
                     _close_inline_edit(label_path)
@@ -1342,10 +1387,15 @@ def _render_resume_canvas_editor() -> None:
         )
 
     resume_canvas.render_canvas_css()
+    canvas_error = st.session_state.get("_tailor_canvas_error")
+    if canvas_error:
+        st.markdown(
+            f'<div class="cos-canvas-error">{html.escape(str(canvas_error))}</div>',
+            unsafe_allow_html=True,
+        )
 
     with st.container(border=True):
         st.markdown('<span class="cos-canvas-anchor"></span>', unsafe_allow_html=True)
-        _render_basics_editor(data)
         resume_canvas.render_basics_header(data.setdefault("basics", {}), data.get("education"))
 
         resume_canvas.render_section("个人总结")
@@ -1374,7 +1424,6 @@ def _render_resume_canvas_editor() -> None:
 
 # ═══ 右栏：简历内容 + PDF 预览 + 深度评估 ═══
 with col_right:
-    resume_canvas.render_canvas_css()
     st.markdown('<div class="cos-right-title">在线简历画布</div>', unsafe_allow_html=True)
     tab_canvas, tab_pdf, tab_deep = st.tabs(["简历内容", "PDF 预览", "深度评估"])
 
@@ -1502,6 +1551,8 @@ with tab_canvas:
         """,
         unsafe_allow_html=True,
     )
+
+    _render_basics_editor(st.session_state.tailor_data)
 
     _orig_pdf = st.session_state.get("uploaded_pdf_bytes")
     if _orig_pdf:
