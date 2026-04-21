@@ -325,6 +325,12 @@ def _render_chat_panel() -> None:
         .cos-chat-user{background:#f5f7fb;}
         .cos-chat-bot{background:#ffffff;}
         .cos-chat-role{font-size:11px;color:#6e6e73;margin-bottom:4px;letter-spacing:0.3px;}
+        [data-testid="stChatInput"] textarea{
+          background:#ffffff !important;
+          color:#1d1d1f !important;
+          border:1px solid rgba(29,29,31,0.10) !important;
+        }
+        [data-testid="stChatInput"] textarea::placeholder{color:#6e6e73 !important;}
         </style>
         """,
         unsafe_allow_html=True,
@@ -1106,4 +1112,3 @@ with tab_preview:
                 conn.close()
                 alert_success(f"已保存：{v_name}")
                 st.rerun()
-

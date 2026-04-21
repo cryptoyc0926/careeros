@@ -26,3 +26,4 @@
 2026-04-21 | fix | web/pages/resume_tailor.py | load_master 带 updated_at + master_signature 变化即重载 tailor_data；st.image 改 width=650 兼容旧 Streamlit
 2026-04-21 | docs | web/services/resume_prompt_rules.py, CHANGELOG.md, web/prompts/resume_writing_rules.md | 规则四件套 v2.3：新增 resume_writing_rules.md（STAR/6 步法/5 槽位/动词偏好/数字规则），只同步版本号文档，未改规则常量
 2026-04-21 09:10 Codex · P0-1 绑定在线编辑 widget 与 tailor_data，避免 rerun 或 chat patch 后字段丢失/旧值覆盖
+2026-04-21 09:11 Codex · P0-2 覆盖 stChatInput textarea 为白底深字，修复 chat 输入框深色底
