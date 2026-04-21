@@ -31,7 +31,7 @@ DB_PATH = settings.db_full_path
 page_header("简历定制 & 在线编辑")
 # 压缩顶部留白
 st.markdown(
-    "<style>div.block-container{padding-top:1.2rem !important}</style>",
+    "<style>div.block-container{padding-top:1.2rem !important;max-width:1500px !important}</style>",
     unsafe_allow_html=True,
 )
 
@@ -542,7 +542,7 @@ def _render_chat_panel() -> None:
 
 
 # ── 布局：两栏（左 JD+Chat / 右 预览+评估）──────────────
-col_left, col_right = st.columns([1.0, 1.8])
+col_left, col_right = st.columns([0.9, 2.4])
 
 # ═══ 左栏：JD 输入 + 历史版本 ═══
 with col_left:
@@ -765,8 +765,155 @@ with col_left:
                 st.rerun()
 
 
-def _render_manual_editor() -> None:
-    """手动分段编辑器（页面底部折叠区）。"""
+def _render_resume_canvas_styles() -> None:
+    st.markdown(
+        """
+        <style>
+        .cos-canvas-anchor{display:none;}
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.cos-canvas-anchor){
+          background:#ffffff !important;
+          border:1px solid rgba(29,29,31,0.10) !important;
+          border-radius:2px !important;
+          box-shadow:0 10px 28px rgba(29,29,31,0.08) !important;
+          max-width:860px !important;
+          margin:0 auto 18px auto !important;
+          padding:26px 30px 30px 30px !important;
+        }
+        .cos-canvas-section{
+          margin:18px 0 10px 0;
+          padding:5px 10px;
+          background:#e8e8ea;
+          color:#111;
+          font-size:18px;
+          font-weight:700;
+          letter-spacing:0;
+          line-height:1.25;
+        }
+        .cos-canvas-row{
+          display:flex;
+          justify-content:space-between;
+          gap:18px;
+          align-items:flex-start;
+          margin:8px 0 2px 0;
+          color:#111;
+        }
+        .cos-canvas-company{font-size:16px;font-weight:700;color:#111;}
+        .cos-canvas-date{font-size:15px;font-weight:700;color:#111;white-space:nowrap;}
+        .cos-canvas-edu{font-size:15px;font-weight:700;color:#111;}
+        .cos-canvas-note{color:#6e6e73;font-size:12px;text-align:center;margin-bottom:8px;}
+        input[aria-label^="canvas_"],
+        textarea[aria-label^="canvas_"]{
+          background:transparent !important;
+          border:1px solid transparent !important;
+          box-shadow:none !important;
+          color:#111 !important;
+          border-radius:4px !important;
+          padding:2px 4px !important;
+          line-height:1.45 !important;
+        }
+        div[data-baseweb="input"]:has(input[aria-label^="canvas_"]),
+        div[data-baseweb="textarea"]:has(textarea[aria-label^="canvas_"]){
+          background:transparent !important;
+          border:1px solid transparent !important;
+          box-shadow:none !important;
+        }
+        [data-testid="stTextInput"]:has(input[aria-label^="canvas_"]) div,
+        [data-testid="stTextArea"]:has(textarea[aria-label^="canvas_"]) div{
+          background:transparent !important;
+          border-color:transparent !important;
+          box-shadow:none !important;
+        }
+        input[aria-label^="canvas_"]:focus,
+        textarea[aria-label^="canvas_"]:focus{
+          background:#fff !important;
+          border-color:rgba(0,113,227,0.35) !important;
+          box-shadow:0 0 0 3px rgba(0,113,227,0.10) !important;
+        }
+        div[data-baseweb="input"]:has(input[aria-label^="canvas_"]:focus),
+        div[data-baseweb="textarea"]:has(textarea[aria-label^="canvas_"]:focus){
+          background:#fff !important;
+          border-color:rgba(0,113,227,0.35) !important;
+          box-shadow:0 0 0 3px rgba(0,113,227,0.10) !important;
+        }
+        input[aria-label="canvas_name"]{
+          text-align:center !important;
+          font-size:34px !important;
+          font-weight:800 !important;
+          line-height:1.1 !important;
+          padding:0 !important;
+        }
+        input[aria-label^="canvas_contact_"]{
+          text-align:center !important;
+          font-size:13px !important;
+        }
+        input[aria-label^="canvas_role_"]{
+          text-align:center !important;
+          font-weight:700 !important;
+          font-size:15px !important;
+        }
+        textarea[aria-label="canvas_profile"]{
+          font-size:14px !important;
+          min-height:84px !important;
+        }
+        textarea[aria-label^="canvas_bullet_"]{
+          font-size:14px !important;
+          min-height:42px !important;
+        }
+        input[aria-label^="canvas_skill_label_"]{
+          font-weight:700 !important;
+          font-size:14px !important;
+        }
+        input[aria-label^="canvas_skill_text_"]{
+          font-size:14px !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _render_canvas_section(title: str) -> None:
+    st.markdown(f'<div class="cos-canvas-section">{html.escape(title)}</div>', unsafe_allow_html=True)
+
+
+def _render_experience_canvas(section_key: str, title: str, role_prefix: str, bullet_prefix: str) -> None:
+    data = st.session_state.tailor_data
+    items = data.get(section_key) or []
+    if not items:
+        return
+    _render_canvas_section(title)
+    for item_idx, item in enumerate(items):
+        left, role_col, right = st.columns([1.35, 1.15, 0.9])
+        with left:
+            st.markdown(
+                f'<div class="cos-canvas-company">{html.escape(str(item.get("company", "")))}</div>',
+                unsafe_allow_html=True,
+            )
+        with role_col:
+            item["role"] = _bound_text_input(
+                f"canvas_role_{section_key}_{item_idx}",
+                item.get("role", ""),
+                f"{role_prefix}_{item_idx}",
+                label_visibility="collapsed",
+            )
+        with right:
+            st.markdown(
+                f'<div class="cos-canvas-date">{html.escape(str(item.get("date", "")))}</div>',
+                unsafe_allow_html=True,
+            )
+
+        for bullet_idx, bullet in enumerate(item.get("bullets") or []):
+            item["bullets"][bullet_idx] = _bound_text_area(
+                f"canvas_bullet_{section_key}_{item_idx}_{bullet_idx}",
+                bullet,
+                key=f"{bullet_prefix}_{item_idx}_{bullet_idx}",
+                height=46,
+                label_visibility="collapsed",
+            )
+
+
+def _render_resume_canvas_editor() -> None:
+    """A4 文档式结构化编辑器：视觉像简历，底层仍写回 tailor_data。"""
     data = st.session_state.tailor_data
     meta = st.session_state.tailor_meta
 
@@ -776,40 +923,45 @@ def _render_manual_editor() -> None:
             f"{meta.get('change_notes', '')}"
         )
 
-    with st.expander("基本信息", expanded=False):
-        basics = data.setdefault("basics", {})
-        c1, c2 = st.columns(2)
-        with c1:
-            basics["name"] = _bound_text_input(
-                "姓名", basics.get("name", ""), "tailor_basics_name"
-            )
-            basics["email"] = _bound_text_input(
-                "邮箱", basics.get("email", ""), "tailor_basics_email"
-            )
-            basics["target_role"] = _bound_text_input(
-                "求职意向", basics.get("target_role", ""), "tailor_basics_target_role"
-            )
-        with c2:
-            basics["phone"] = _bound_text_input(
-                "电话", basics.get("phone", ""), "tailor_basics_phone"
-            )
-            basics["city"] = _bound_text_input(
-                "期望城市", basics.get("city", ""), "tailor_basics_city"
-            )
-            basics["availability"] = _bound_text_input(
-                "到岗时间", basics.get("availability", ""), "tailor_basics_availability"
-            )
-        basics["photo"] = basics.get("photo", "")
+    _render_resume_canvas_styles()
 
-    with st.expander("个人总结", expanded=True):
-        data["profile"] = _bound_text_area(
-            "profile",
-            data.get("profile", ""),
-            "tailor_profile",
-            height=120,
+    with st.container(border=True):
+        st.markdown('<span class="cos-canvas-anchor"></span>', unsafe_allow_html=True)
+        basics = data.setdefault("basics", {})
+        basics["name"] = _bound_text_input(
+            "canvas_name",
+            basics.get("name", ""),
+            "tailor_basics_name",
             label_visibility="collapsed",
         )
-        if st.button("仅重写此段", key="rw_profile"):
+        contact_cols = st.columns([1.1, 1.4, 1.4, 1.0, 1.1])
+        contact_fields = [
+            ("phone", "tailor_basics_phone"),
+            ("email", "tailor_basics_email"),
+            ("target_role", "tailor_basics_target_role"),
+            ("city", "tailor_basics_city"),
+            ("availability", "tailor_basics_availability"),
+        ]
+        for col, (field, key) in zip(contact_cols, contact_fields):
+            with col:
+                basics[field] = _bound_text_input(
+                    f"canvas_contact_{field}",
+                    basics.get(field, ""),
+                    key,
+                    label_visibility="collapsed",
+                )
+        basics["photo"] = basics.get("photo", "")
+
+        _render_canvas_section("个人总结")
+        data["profile"] = _bound_text_area(
+            "canvas_profile",
+            data.get("profile", ""),
+            "tailor_profile",
+            height=100,
+            label_visibility="collapsed",
+        )
+
+        if st.button("仅重写个人总结", key="rw_profile"):
             if not st.session_state.tailor_jd:
                 alert_warning("请先在左栏粘贴 JD")
             else:
@@ -818,52 +970,50 @@ def _render_manual_editor() -> None:
                         intent = meta.get("jd_intent") or resume_tailor.extract_jd_intent(
                             st.session_state.tailor_jd
                         )
-                        data["profile"] = resume_tailor.rewrite_section(
-                            data["profile"], intent
-                        )
+                        _push_undo_snapshot(label="重写个人总结")
+                        data["profile"] = resume_tailor.rewrite_section(data["profile"], intent)
+                        _clear_tailor_preview_cache()
                         st.rerun()
                     except AIError as e:
                         alert_danger(str(e))
 
-    with st.expander("项目经历", expanded=False):
-        for p_idx, p in enumerate(data["projects"]):
-            st.markdown(f"**{p['company']}** — {p['date']}")
-            p["role"] = _bound_text_input(
-                "职位", p.get("role", ""), f"proj_role_{p_idx}"
-            )
-            for b_idx, b in enumerate(p["bullets"]):
-                p["bullets"][b_idx] = _bound_text_area(
-                    f"bullet {b_idx + 1}", b,
-                    key=f"proj_{p_idx}_b_{b_idx}", height=68,
-                    label_visibility="collapsed",
-                )
+        _render_experience_canvas("projects", "项目经历", "proj_role", "proj_b")
+        _render_experience_canvas("internships", "实习经历", "intern_role", "intern_b")
 
-    with st.expander("实习经历", expanded=False):
-        for i_idx, i in enumerate(data["internships"]):
-            st.markdown(f"**{i['company']}** — {i['date']}")
-            i["role"] = _bound_text_input(
-                "职位", i.get("role", ""), f"intern_role_{i_idx}"
-            )
-            for b_idx, b in enumerate(i["bullets"]):
-                i["bullets"][b_idx] = _bound_text_area(
-                    f"bullet {b_idx + 1}", b,
-                    key=f"intern_{i_idx}_b_{b_idx}", height=68,
-                    label_visibility="collapsed",
-                )
+        skills = data.get("skills") or []
+        if skills:
+            _render_canvas_section("技能证书")
+            for s_idx, s in enumerate(skills):
+                cols = st.columns([1.05, 4])
+                with cols[0]:
+                    s["label"] = _bound_text_input(
+                        f"canvas_skill_label_{s_idx}",
+                        s.get("label", ""),
+                        f"skill_l_{s_idx}",
+                        label_visibility="collapsed",
+                    )
+                with cols[1]:
+                    s["text"] = _bound_text_input(
+                        f"canvas_skill_text_{s_idx}",
+                        s.get("text", ""),
+                        f"skill_t_{s_idx}",
+                        label_visibility="collapsed",
+                    )
 
-    with st.expander("技能证书", expanded=False):
-        for s_idx, s in enumerate(data["skills"]):
-            cols = st.columns([1, 4])
-            with cols[0]:
-                s["label"] = _bound_text_input(
-                    "标签", s.get("label", ""), f"skill_l_{s_idx}",
-                    label_visibility="collapsed",
+        education = data.get("education") or []
+        if education:
+            _render_canvas_section("教育背景")
+            for edu in education:
+                school = html.escape(str(edu.get("school", "")))
+                major = html.escape(str(edu.get("major", "")))
+                date = html.escape(str(edu.get("date", "")))
+                st.markdown(
+                    f'<div class="cos-canvas-row"><span class="cos-canvas-edu">{school} · {major}</span>'
+                    f'<span class="cos-canvas-date">{date}</span></div>',
+                    unsafe_allow_html=True,
                 )
-            with cols[1]:
-                s["text"] = _bound_text_input(
-                    "内容", s.get("text", ""), f"skill_t_{s_idx}",
-                    label_visibility="collapsed",
-                )
+                for bullet in edu.get("bullets") or []:
+                    st.markdown(f"- {html.escape(str(bullet))}")
 
     st.session_state.tailor_data = data
 
@@ -987,17 +1137,15 @@ with tab_eval:
 with tab_preview:
     # ── 诚实提示：新 PDF 不是原件排版 ─────────────────────────
     alert_info(
-        "**预览说明**：下方「系统生成的新 PDF」使用 **CareerOS 内置模板**排版，"
-        "**不会保持你原简历的视觉样式**（字体/分栏/配色可能不同）。"
-        "如需 1:1 保持原简历排版，建议：复制上面的改写文字 → 回你原本的 Word/PPT/Canva 文件里手动替换。"
-        "顶部「原简历 PDF」作为参照对比。"
+        "**在线简历画布**：右侧内容可直接编辑，PDF / DOCX 会按同一份内容生成。"
+        "原简历 PDF 只作为参照，不作为编辑源。"
     )
 
     # ── 原 PDF（来自主简历页上传的 session_state）─────────────
     _orig_pdf = st.session_state.get("uploaded_pdf_bytes")
     if _orig_pdf:
         import base64 as _b64
-        with st.expander(f"📄 你上传的原简历 PDF（{len(_orig_pdf):,} 字节）· 对照参考", expanded=False):
+        with st.expander(f"你上传的原简历 PDF（{len(_orig_pdf):,} 字节）· 对照参考", expanded=False):
             _b64_s = _b64.b64encode(_orig_pdf).decode()
             st.markdown(
                 f'<iframe src="data:application/pdf;base64,{_b64_s}" '
@@ -1008,11 +1156,11 @@ with tab_preview:
         st.caption("（没上传过原 PDF · 去「主简历 → 上传文件」上传后，这里可以看到原件对照）")
 
     # ── 可编辑简历（主编辑区）──────────────────────────
-    st.markdown("##### 在线编辑（改动后自动刷新预览）")
-    _render_manual_editor()
+    st.markdown("##### 在线简历画布")
+    _render_resume_canvas_editor()
 
     st.markdown("---")
-    st.markdown("##### 系统生成的新 PDF（基于模板）")
+    st.markdown("##### 导出文件")
 
     preview_key = hashlib.sha256(
         json.dumps(st.session_state.tailor_data, ensure_ascii=False, sort_keys=True).encode("utf-8")
@@ -1052,20 +1200,21 @@ with tab_preview:
     elif pdf_bytes is None:
         st.caption("等待可渲染的简历内容。")
     else:
-        # 三级降级预览：PyMuPDF → pdf2image → iframe
-        if png_bytes:
-            st.image(png_bytes, width=650)
-        else:
-            # 最终降级：直接嵌 PDF iframe
-            import base64 as _b64p
-            _b64_pdf = _b64p.b64encode(pdf_bytes).decode()
-            st.markdown(
-                f'<iframe src="data:application/pdf;base64,{_b64_pdf}" '
-                f'width="100%" height="640px" '
-                f'style="border:1px solid rgba(29,29,31,0.08);border-radius:14px"></iframe>',
-                unsafe_allow_html=True,
-            )
-            st.caption("（PNG 预览依赖不可用，已改为浏览器内嵌 PDF 视图）")
+        with st.expander("PDF 导出预览", expanded=False):
+            # 三级降级预览：PyMuPDF → pdf2image → iframe
+            if png_bytes:
+                st.image(png_bytes, width=650)
+            else:
+                # 最终降级：直接嵌 PDF iframe
+                import base64 as _b64p
+                _b64_pdf = _b64p.b64encode(pdf_bytes).decode()
+                st.markdown(
+                    f'<iframe src="data:application/pdf;base64,{_b64_pdf}" '
+                    f'width="100%" height="640px" '
+                    f'style="border:1px solid rgba(29,29,31,0.08);border-radius:14px"></iframe>',
+                    unsafe_allow_html=True,
+                )
+                st.caption("（PNG 预览依赖不可用，已改为浏览器内嵌 PDF 视图）")
 
         # ── 三个下载入口 ───────────────────────────────
         _base_name = f"{st.session_state.tailor_data['basics'].get('name', 'resume')}_简历_{st.session_state.tailor_data['basics'].get('target_role', '定制版')}"

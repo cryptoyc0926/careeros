@@ -29,3 +29,4 @@
 2026-04-21 09:11 Codex · P0-2 覆盖 stChatInput textarea 为白底深字，修复 chat 输入框深色底
 2026-04-21 09:13 Codex · P0-3 保存版本时写入 chat_transcript_json，加载历史版本时恢复 chat 消息流水
 2026-04-21 09:42 Codex · P1/P2 简历定制页改为 hash 节流自动预览、字符级 patch diff、ENABLE_CHAT_TAILOR 开关，并在新 chat 消息时清理旧 pending patch
+2026-04-21 10:18 Codex · resume_tailor 右侧编辑区改为 A4 文档式结构化画布，替换 expander 表单；保留 tailor_data 绑定、Chat patch、自动预览和导出链路
