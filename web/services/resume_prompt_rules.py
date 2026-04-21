@@ -3,22 +3,25 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 所有调用 Claude 生成/改写简历的 system prompt 都应引用本文件的常量，避免规则散落多处不一致。
 
-规则版本：v2.2（2026-04-20）
-配套文档：
-  - web/prompts/resume_system.md         — 人类可读的完整规则（内容 + DEAI + 加粗精简版）
+规则版本：v2.3（2026-04-21）
+配套文档 · 四件套：
+  - web/prompts/resume_system.md         — AI 生成 prompt（内容 + DEAI + 加粗精简版）
   - web/prompts/resume_bold_rules.md     — 加粗规则详细说明 + HTML 实现
   - web/prompts/resume_layout_rules.md   — 排版布局 / 头部结构 / 压页策略 / 定制工作流
+  - web/prompts/resume_writing_rules.md  — 内容书写（STAR / 6 步法 / 5 槽位 / 动词偏好 / 数字规则）
   - 04_CAREEROS/简历加粗规则.md           — Obsidian 归档（加粗）
   - 04_CAREEROS/简历布局规则.md           — Obsidian 归档（布局）
+  - 04_CAREEROS/简历写作规则.md           — Obsidian 归档（写作）
 
 维护原则：
   - 本文件改动后，必须同步更新上述三处文档（保持版本号一致）
   - CHANGELOG.md 记录规则变更
 """
 
-RULE_VERSION = "2.2"
-RULE_UPDATED = "2026-04-20"
+RULE_VERSION = "2.3"
+RULE_UPDATED = "2026-04-21"
 # v2.2：新增 resume_layout_rules.md（排版 / 布局 / 压页策略 / 每次定制工作流）
+# v2.3：新增 resume_writing_rules.md（STAR 变形 / 6 步法 / 5 槽位 / 动词偏好 / 数字规则）
 
 
 # ═══════════════════════════════════════════════════════════════
