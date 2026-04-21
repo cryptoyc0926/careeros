@@ -3,6 +3,7 @@
 import streamlit as st
 import json
 from models.database import query, execute
+from services.job_filter import filter_excluded_rows
 from components.ui import page_header, badge, divider, empty_state, alert_success, alert_info, alert_warning, alert_danger
 
 page_header("浏览职位描述", subtitle="查看已抓取的所有 JD")
@@ -69,6 +70,8 @@ sort_map = {
 sql += f" ORDER BY {sort_map[sort_by]}"
 
 rows = query(sql, tuple(params))
+# 全局排除公司兜底（CLAUDE.md §目标公司 → 明确排除）
+rows = filter_excluded_rows(rows, company_key="company")
 
 if not rows:
     alert_info("没有找到职位描述。")

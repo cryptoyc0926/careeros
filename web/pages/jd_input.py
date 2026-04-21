@@ -5,6 +5,7 @@ import json
 import io
 from datetime import datetime
 from models.database import execute
+from services.job_filter import is_excluded_company
 from components.ui import page_header, section_title, divider, apple_section_heading, alert_success, alert_info, alert_warning, alert_danger
 
 
@@ -272,6 +273,11 @@ with tab_url:
             if st.button("保存到 JD 库", type="primary", key="scrape_save"):
                 if not s_company or not s_title or not s_raw_text:
                     alert_danger("公司名称、职位名称和职位描述为必填项。")
+                elif is_excluded_company(s_company):
+                    alert_warning(
+                        f"**{s_company}** 在排除公司名单里（字节/腾讯/蚂蚁/网易），"
+                        "根据 CLAUDE.md 规则不会入库。请更换目标公司。"
+                    )
                 else:
                     jd_id = execute(
                         """INSERT INTO job_descriptions
@@ -313,6 +319,9 @@ with tab_url:
                 success_count = 0
                 for r in results:
                     if r.success and r.company and r.title and r.raw_text:
+                        if is_excluded_company(r.company):
+                            alert_warning(f"跳过 **{r.company}**（排除公司名单）— {r.title}")
+                            continue
                         jd_id = execute(
                             """INSERT INTO job_descriptions
                                (company, title, location, raw_text, source_url, notes)
@@ -389,6 +398,8 @@ with tab_smart_paste:
             if st.button("保存到 JD 库", type="primary", key="sp_save"):
                 if not sp_company or not sp_title or not sp_raw:
                     alert_danger("公司名称、职位名称和职位描述为必填项。")
+                elif is_excluded_company(sp_company):
+                    alert_warning(f"**{sp_company}** 在排除公司名单里（字节/腾讯/蚂蚁/网易），不入库。")
                 else:
                     jd_id = execute(
                         """INSERT INTO job_descriptions
@@ -418,6 +429,8 @@ with tab_paste:
     if st.button("保存 JD", type="primary", key="paste_save"):
         if not company or not job_title or not raw_text:
             alert_danger("公司名称、职位名称和职位描述为必填项。")
+        elif is_excluded_company(company):
+            alert_warning(f"**{company}** 在排除公司名单里（字节/腾讯/蚂蚁/网易），不入库。")
         else:
             jd_id = execute(
                 """INSERT INTO job_descriptions (company, title, location, raw_text, source_url)
@@ -459,6 +472,8 @@ with tab_upload:
             if st.button("保存 JD", type="primary", key="upload_save"):
                 if not up_company or not up_title or not edited_text:
                     alert_danger("公司名称、职位名称和描述内容为必填项。")
+                elif is_excluded_company(up_company):
+                    alert_warning(f"**{up_company}** 在排除公司名单里（字节/腾讯/蚂蚁/网易），不入库。")
                 else:
                     jd_id = execute(
                         """INSERT INTO job_descriptions (company, title, location, raw_text)

@@ -6,6 +6,7 @@ import math
 import json
 import yaml
 from models.database import query, execute, sync_job_to_jd, get_jd_id_for_job, has_resume_for_jd
+from services.job_filter import filter_excluded_df
 from config import settings
 from components.ui import (
     badge, tier_badge, status_badge, jd_status_badge,
@@ -25,6 +26,8 @@ def _load_all():
         return pd.DataFrame()
     df = pd.DataFrame(rows)
     df["status"] = df["status"].fillna("NEW")
+    # 全局排除公司兜底（CLAUDE.md §目标公司 → 明确排除）
+    df = filter_excluded_df(df, company_col="公司")
     return df
 
 

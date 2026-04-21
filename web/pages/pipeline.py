@@ -3,6 +3,7 @@
 import streamlit as st
 import pandas as pd
 from models.database import query, execute
+from services.job_filter import filter_excluded_rows
 from components.ui import (
     page_header, section_title, divider, badge, empty_state,
     kanban_column_card, kanban_empty, alert_success, alert_info,
@@ -35,6 +36,7 @@ for col, (status, label, variant) in zip(cols, active_statuses):
             "SELECT id, company, title FROM job_descriptions WHERE status = ? ORDER BY updated_at DESC",
             (status,),
         )
+        rows = filter_excluded_rows(rows, company_key="company")
         # 列头：badge + 数量
         st.markdown(
             badge(label, variant) +
@@ -56,6 +58,7 @@ with st.expander(f"终态记录（已拒绝 / 已放弃）", expanded=False):
                 "SELECT id, company, title FROM job_descriptions WHERE status = ? ORDER BY updated_at DESC",
                 (status,),
             )
+            rows = filter_excluded_rows(rows, company_key="company")
             st.markdown(badge(label, variant) + f' <span style="color:{TEXT_MUTED};font-size:11px">{len(rows)}</span>', unsafe_allow_html=True)
             for r in rows[:5]:
                 st.caption(f"{r['company']} — {r['title']}")
@@ -65,6 +68,7 @@ divider()
 section_title("更新申请状态")
 
 all_jds = query("SELECT id, company, title, status FROM job_descriptions ORDER BY updated_at DESC")
+all_jds = filter_excluded_rows(all_jds, company_key="company")
 if all_jds:
     jd_map = {f"#{r['id']} — {r['company']} / {r['title']} [{r['status']}]": r["id"] for r in all_jds}
     col_sel, col_status, col_btn = st.columns([4, 3, 1.5])
