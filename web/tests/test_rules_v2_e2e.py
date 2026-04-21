@@ -127,9 +127,26 @@ def main():
     print(f"简历规则 v{RULE_VERSION} 端到端验收")
     print("=" * 60)
 
-    # Step 1: 加载 master
-    from pages.master_resume import load_master
-    master = load_master()
+    # Step 1: 加载 master —— 直接从真实 DB（不受 .env DB_PATH 影响）
+    import sqlite3
+    from pathlib import Path as _Path
+    real_db = _Path(__file__).resolve().parent.parent.parent / "data" / "career_os.db"
+    conn = sqlite3.connect(str(real_db))
+    conn.row_factory = sqlite3.Row
+    row = conn.execute("SELECT * FROM resume_master ORDER BY id LIMIT 1").fetchone()
+    conn.close()
+    master = {
+        "id": row["id"],
+        "basics": json.loads(row["basics_json"]),
+        "profile": json.loads(row["profile_json"]),
+        "projects": json.loads(row["projects_json"]),
+        "internships": json.loads(row["internships_json"]),
+        "skills": json.loads(row["skills_json"]),
+        "education": json.loads(row["education_json"]),
+    } if row else None
+    if not master:
+        print("  ❌ master_resume 为空")
+        return
     print(f"\n[1/4] 已加载 master_resume（{len(master.get('projects', []))} 项目 / "
           f"{len(master.get('internships', []))} 实习）")
 
