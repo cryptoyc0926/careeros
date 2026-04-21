@@ -50,28 +50,36 @@ CANVAS_CSS = """
   .cos-canvas .cv-inline-actions{display:flex;gap:6px;align-items:center;}
   .cos-canvas .cv-bullet-read{font-size:13.5px;line-height:1.55;margin:2px 0;}
   .cos-canvas .cv-muted{color:#6e6e73;}
-  h1.cv-name{font-size:18px;font-weight:600;letter-spacing:-.01em;
-    margin:0 0 2px;text-align:center;color:#1d1d1f;line-height:1.14;}
-  .cv-contact{text-align:center;color:#6e6e73;font-size:8.8px;margin-bottom:5px;line-height:1.18;}
-  h2.cv-section{font-size:10.5px;font-weight:600;margin:7px 0 3px;
-    padding-bottom:3px;border-bottom:1px solid rgba(29,29,31,0.12);letter-spacing:.02em;
+  h1.cv-name{font-size:28px;font-weight:600;letter-spacing:-.01em;
+    margin:0 0 6px;text-align:center;color:#1d1d1f;line-height:1.18;}
+  .cv-contact{text-align:center;color:#6e6e73;font-size:13px;margin-bottom:16px;line-height:1.35;}
+  h2.cv-section{font-size:15px;font-weight:600;margin:18px 0 8px;
+    padding-bottom:4px;border-bottom:1px solid rgba(29,29,31,0.12);letter-spacing:.02em;
     color:#1d1d1f;}
-  .cv-item{position:relative;margin-bottom:1px;}
+  .cv-item{position:relative;margin-bottom:8px;}
   .cv-item-head{display:flex;justify-content:space-between;align-items:baseline;
-    gap:8px;font-size:9.8px;margin-bottom:0;color:#1d1d1f;line-height:1.12;}
+    gap:12px;font-size:13px;margin-bottom:2px;color:#1d1d1f;line-height:1.25;}
   .cv-item-title{font-weight:600;}
   .cv-item-role{font-weight:500;color:#1d1d1f;margin-left:8px;}
-  .cv-item-meta{color:#6e6e73;font-size:8.8px;white-space:nowrap;}
-  .cv-skill-row,.cv-bullet-read,.cv-edu-row{font-size:9.4px;line-height:1.16;color:#1d1d1f;}
-  .cv-skill-row{margin:0;}
+  .cv-item-meta{color:#6e6e73;font-size:12px;white-space:nowrap;}
+  .cv-skill-row,.cv-bullet-read,.cv-edu-row{font-size:13px;line-height:1.42;color:#1d1d1f;}
+  .cv-skill-row{margin:2px 0;}
   .cv-skill-label{font-weight:600;margin-right:6px;}
-  .cv-edu-row{display:flex;justify-content:space-between;gap:12px;margin:2px 0;}
+  .cv-edu-row{display:flex;justify-content:space-between;gap:12px;margin:3px 0;}
+  .cv-item-divider{border-bottom:1px dashed rgba(29,29,31,0.08);margin:7px 0 10px;}
   .cv-edit-pane{
     margin:6px 0 10px;padding:8px 10px;border-radius:8px;
     background:#f5f5f7;border:1px solid rgba(29,29,31,0.08);
   }
   .cos-canvas-anchor{display:none;}
   div[data-testid="element-container"]:has(.cos-canvas-anchor){
+    display:none !important;
+    height:0 !important;
+    margin:0 !important;
+    padding:0 !important;
+  }
+  div[data-testid="element-container"]:has(.cos-bullet-actions-anchor),
+  div[data-testid="element-container"]:has(.cos-section-ai-anchor){
     display:none !important;
     height:0 !important;
     margin:0 !important;
@@ -85,7 +93,7 @@ CANVAS_CSS = """
     box-sizing:border-box !important;
     max-width:820px !important;
     margin:0 auto 32px auto !important;
-    padding:10px 18px !important;
+    padding:48px 56px !important;
   }
   div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] .cos-canvas-anchor) > div > div[data-testid="stVerticalBlock"]{
     width:100% !important;
@@ -104,11 +112,8 @@ CANVAS_CSS = """
     color:#1d1d1f !important;
     border:1px solid rgba(29,29,31,0.14) !important;
     box-shadow:none !important;
-    padding:0 4px !important;
-    min-height:18px !important;
-    height:18px !important;
-    font-size:9px !important;
-    line-height:1 !important;
+    min-height:28px !important;
+    font-size:13px !important;
     border-radius:5px !important;
   }
   div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] .cos-canvas-anchor) .stButton button:hover,
@@ -119,6 +124,67 @@ CANVAS_CSS = """
     color:#1d1d1f !important;
     border-color:rgba(0,113,227,0.28) !important;
     box-shadow:0 0 0 2px rgba(0,113,227,0.10) !important;
+  }
+  div[data-testid="stVerticalBlock"]:has(.cos-bullet-actions-anchor) .stButton button{
+    width:32px !important;
+    min-width:32px !important;
+    height:28px !important;
+    min-height:28px !important;
+    padding:0 !important;
+    font-size:13px !important;
+    line-height:1 !important;
+    border:none !important;
+    border-radius:6px !important;
+    background:transparent !important;
+    box-shadow:none !important;
+  }
+  div[data-testid="column"]:has(.cos-bullet-actions-anchor) button[kind="secondary"]{
+    width:32px !important;
+    min-width:32px !important;
+    height:28px !important;
+    min-height:28px !important;
+    padding:0 !important;
+    font-size:13px !important;
+    line-height:1 !important;
+    border:none !important;
+    border-radius:6px !important;
+    background:transparent !important;
+    box-shadow:none !important;
+  }
+  div[data-testid="stVerticalBlock"]:has(.cos-bullet-actions-anchor) .stButton button:hover,
+  div[data-testid="stVerticalBlock"]:has(.cos-bullet-actions-anchor) .stButton button:active,
+  div[data-testid="stVerticalBlock"]:has(.cos-bullet-actions-anchor) .stButton button:focus,
+  div[data-testid="stVerticalBlock"]:has(.cos-bullet-actions-anchor) .stButton button:focus-visible,
+  div[data-testid="column"]:has(.cos-bullet-actions-anchor) button[kind="secondary"]:hover,
+  div[data-testid="column"]:has(.cos-bullet-actions-anchor) button[kind="secondary"]:active,
+  div[data-testid="column"]:has(.cos-bullet-actions-anchor) button[kind="secondary"]:focus,
+  div[data-testid="column"]:has(.cos-bullet-actions-anchor) button[kind="secondary"]:focus-visible{
+    background:rgba(0,0,0,0.06) !important;
+    border:none !important;
+    box-shadow:none !important;
+    color:#1d1d1f !important;
+  }
+  div[data-testid="stVerticalBlock"]:has(.cos-section-ai-anchor) .stButton button{
+    background:transparent !important;
+    border:none !important;
+    box-shadow:none !important;
+    color:#0066cc !important;
+    padding:0 !important;
+    min-height:24px !important;
+    height:24px !important;
+    font-size:12px !important;
+    line-height:1 !important;
+    text-align:right !important;
+  }
+  div[data-testid="stVerticalBlock"]:has(.cos-section-ai-anchor) .stButton button:hover,
+  div[data-testid="stVerticalBlock"]:has(.cos-section-ai-anchor) .stButton button:active,
+  div[data-testid="stVerticalBlock"]:has(.cos-section-ai-anchor) .stButton button:focus,
+  div[data-testid="stVerticalBlock"]:has(.cos-section-ai-anchor) .stButton button:focus-visible{
+    background:transparent !important;
+    border:none !important;
+    box-shadow:none !important;
+    color:#004999 !important;
+    text-decoration:underline !important;
   }
   div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] .cos-canvas-anchor) textarea,
   div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] .cos-canvas-anchor) input{

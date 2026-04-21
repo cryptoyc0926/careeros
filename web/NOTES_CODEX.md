@@ -36,3 +36,4 @@
 2026-04-21 12:21 Codex · resume_tailor 方向 A 审查修复：A4 容器 CSS 精准命中，手动保存只拦截本次新增硬错，bullet 操作压缩为短按钮
 2026-04-21 13:28 Codex · resume_tailor 视觉修正：说明区移到画布下方，A4 内容压紧，画布内编辑按钮强制白底浅交互
 2026-04-21 14:31 Codex · resume_tailor 紧凑修正：页头改薄、隐藏空 style/marker 间距、基本信息编辑移出画布、bullet 结构操作可用且错误全宽显示
+2026-04-21 15:02 Codex · resume_tailor P0 返工：A4 改用真实 Streamlit container 锚定，移除空 div 画布壳，bullet 仅保留上移/下移/删除，section 增加 AI 重写入口

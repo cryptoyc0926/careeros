@@ -42,7 +42,7 @@ st.markdown(
     div.block-container,
     .main .block-container,
     [data-testid="stMainBlockContainer"]{
-      padding-top:0.55rem !important;
+      padding-top:72px !important;
       max-width:1500px !important;
     }
     [data-testid="stMainBlockContainer"] hr{
@@ -1240,31 +1240,97 @@ def _apply_bullet_action(section_key: str, item_idx: int, bullet_idx: int, actio
             st.rerun()
 
 
+def _section_rewrite_intent() -> dict | None:
+    if not st.session_state.tailor_jd.strip():
+        _set_canvas_error("请先在左栏粘贴 JD，再使用 AI 重写本段")
+        return None
+    meta = st.session_state.tailor_meta or {}
+    intent = meta.get("jd_intent")
+    if intent:
+        return intent
+    return resume_tailor.extract_jd_intent(st.session_state.tailor_jd)
+
+
+def _ai_rewrite_section(section_key: str, title: str) -> None:
+    intent = _section_rewrite_intent()
+    if not intent:
+        st.rerun()
+    data = st.session_state.tailor_data
+    patch: list[dict] = []
+    with st.spinner(f"AI 正在重写{title}..."):
+        if section_key == "profile":
+            original = str(data.get("profile", "") or "")
+            patch.append(
+                {
+                    "op": "replace",
+                    "path": "profile",
+                    "value": resume_tailor.rewrite_section(original, intent, hint=title),
+                }
+            )
+        elif section_key in ("projects", "internships"):
+            for item_idx, item in enumerate(data.get(section_key) or []):
+                for bullet_idx, bullet in enumerate(item.get("bullets") or []):
+                    patch.append(
+                        {
+                            "op": "replace",
+                            "path": f"{section_key}[{item_idx}].bullets[{bullet_idx}]",
+                            "value": resume_tailor.rewrite_section(str(bullet), intent, hint=title),
+                        }
+                    )
+        elif section_key == "skills":
+            for skill_idx, skill in enumerate(data.get("skills") or []):
+                patch.append(
+                    {
+                        "op": "replace",
+                        "path": f"skills[{skill_idx}].text",
+                        "value": resume_tailor.rewrite_section(
+                            str(skill.get("text", "") or ""),
+                            intent,
+                            hint=title,
+                        ),
+                    }
+                )
+    if patch and _apply_resume_patch(patch, label=f"AI 重写{title}"):
+        st.rerun()
+    st.rerun()
+
+
+def _render_section_header(title: str, section_key: str, *, disabled: bool = False) -> None:
+    title_col, action_col = st.columns([4, 1], gap="small", vertical_alignment="center")
+    with title_col:
+        resume_canvas.render_section(title)
+    with action_col:
+        st.markdown('<span class="cos-section-ai-anchor"></span>', unsafe_allow_html=True)
+        if st.button(
+            "AI 重写本段",
+            key=f"ai_rewrite_section_{section_key}",
+            use_container_width=True,
+            disabled=disabled,
+        ):
+            _ai_rewrite_section(section_key, title)
+
+
 def _render_bullet(section_key: str, item_idx: int, bullet_idx: int, bullet: str) -> None:
     path = f"{_bullet_list_path(section_key, item_idx)}[{bullet_idx}]"
     if st.session_state.get(_path_state_key("edit_mode", path)):
         _render_edit_pane(path, bullet, height=86)
         return
-    text_col, edit_col, add_col, up_col, down_col, del_col = st.columns([8, 0.55, 0.55, 0.55, 0.55, 0.55])
+    text_col, up_col, down_col, del_col = st.columns([20, 1, 1, 1], gap="small")
     with text_col:
         st.markdown(
             f'<div class="cv-bullet-read">• {resume_canvas.rich_text_html(bullet)}</div>',
             unsafe_allow_html=True,
         )
-    with edit_col:
-        if st.button("改", key=_path_state_key("edit", path), use_container_width=True, help="编辑这一条"):
-            _open_inline_edit(path, bullet)
-            st.rerun()
-    with add_col:
-        if st.button("加", key=_path_state_key("insert", path), use_container_width=True, help="在下方插入一条"):
-            _apply_bullet_action(section_key, item_idx, bullet_idx, "insert")
     with up_col:
+        st.markdown('<span class="cos-bullet-actions-anchor"></span>', unsafe_allow_html=True)
         if st.button("↑", key=_path_state_key("up", path), use_container_width=True, help="上移"):
             _apply_bullet_action(section_key, item_idx, bullet_idx, "up")
     with down_col:
+        st.markdown('<span class="cos-bullet-actions-anchor"></span>', unsafe_allow_html=True)
         if st.button("↓", key=_path_state_key("down", path), use_container_width=True, help="下移"):
             _apply_bullet_action(section_key, item_idx, bullet_idx, "down")
     with del_col:
+        st.markdown('<span class="cos-bullet-actions-anchor"></span>', unsafe_allow_html=True)
         if st.button("×", key=_path_state_key("delete", path), use_container_width=True, help="删除这一条"):
             _apply_bullet_action(section_key, item_idx, bullet_idx, "delete")
 
@@ -1274,9 +1340,8 @@ def _render_experience_canvas(section_key: str, title: str) -> None:
     items = data.get(section_key) or []
     if not items:
         return
-    resume_canvas.render_section(title)
+    _render_section_header(title, section_key)
     for item_idx, item in enumerate(items):
-        st.markdown('<div class="cv-item">', unsafe_allow_html=True)
         role_path = f"{section_key}[{item_idx}].role"
         if st.session_state.get(_path_state_key("edit_mode", role_path)):
             resume_canvas.render_item_header(item.get("company", ""), "", item.get("date", ""))
@@ -1295,14 +1360,19 @@ def _render_experience_canvas(section_key: str, title: str) -> None:
                     st.rerun()
         for bullet_idx, bullet in enumerate(item.get("bullets") or []):
             _render_bullet(section_key, item_idx, bullet_idx, bullet)
-        st.markdown("</div>", unsafe_allow_html=True)
+        if item_idx < len(items) - 1:
+            st.markdown(
+                '<hr style="border:none;border-top:1px dashed rgba(29,29,31,0.08);'
+                'margin:16px 0 8px;">',
+                unsafe_allow_html=True,
+            )
 
 
 def _render_skills_canvas() -> None:
     skills = st.session_state.tailor_data.get("skills") or []
     if not skills:
         return
-    resume_canvas.render_section("技能证书")
+    _render_section_header("技能证书", "skills")
     for skill_idx, skill in enumerate(skills):
         label_path = f"skills[{skill_idx}].label"
         text_path = f"skills[{skill_idx}].text"
@@ -1359,7 +1429,7 @@ def _render_education_canvas() -> None:
     education = st.session_state.tailor_data.get("education") or []
     if not education:
         return
-    resume_canvas.render_section("教育背景")
+    _render_section_header("教育背景", "education", disabled=True)
     for edu in education:
         school = resume_canvas.esc(edu.get("school", ""))
         major = resume_canvas.esc(edu.get("major", ""))
@@ -1398,23 +1468,8 @@ def _render_resume_canvas_editor() -> None:
         st.markdown('<span class="cos-canvas-anchor"></span>', unsafe_allow_html=True)
         resume_canvas.render_basics_header(data.setdefault("basics", {}), data.get("education"))
 
-        resume_canvas.render_section("个人总结")
+        _render_section_header("个人总结", "profile")
         _render_editable_block("profile", data.get("profile", ""), block_class="cv-bullet-read", height=112)
-        if st.button("仅重写个人总结", key="rw_profile"):
-            if not st.session_state.tailor_jd:
-                alert_warning("请先在左栏粘贴 JD")
-            else:
-                with st.spinner("重写中..."):
-                    try:
-                        intent = meta.get("jd_intent") or resume_tailor.extract_jd_intent(
-                            st.session_state.tailor_jd
-                        )
-                        _push_undo_snapshot(label="重写个人总结")
-                        data["profile"] = resume_tailor.rewrite_section(data["profile"], intent)
-                        _clear_tailor_preview_cache()
-                        st.rerun()
-                    except AIError as e:
-                        alert_danger(str(e))
 
         _render_experience_canvas("projects", "项目经历")
         _render_experience_canvas("internships", "实习经历")
