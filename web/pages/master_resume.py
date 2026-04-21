@@ -11,6 +11,7 @@ from __future__ import annotations
 import io
 import json
 import sqlite3
+import hashlib
 from pathlib import Path
 
 import streamlit as st
@@ -141,6 +142,20 @@ def save_master(m: dict) -> None:
     conn.close()
 
 
+def clear_tailor_state_after_master_change() -> None:
+    """主简历变更后清空定制页缓存，避免继续使用旧经历/旧 PDF。"""
+    for key in (
+        "tailor_data",
+        "tailor_meta",
+        "tailor_jd",
+        "_tailor_preview_key",
+        "_tailor_preview_pdf",
+        "_tailor_master_signature",
+        "eval_data",
+    ):
+        st.session_state.pop(key, None)
+
+
 # ═══════════════════════════════════════════════════════════════
 # 工具：bullets 列表 ↔ 多行文本互转（编辑时更方便）
 # ═══════════════════════════════════════════════════════════════
@@ -176,6 +191,7 @@ with top_col1:
 with top_col2:
     if st.button("保存全部", type="primary", use_container_width=True):
         save_master(st.session_state.master_data)
+        clear_tailor_state_after_master_change()
         st.session_state.master_data = load_master()
         st.session_state["_just_saved"] = True
         st.rerun()
@@ -406,11 +422,10 @@ with tab_upload:
         with st.spinner("提取文本..."):
             text = extract_resume_text(f)
         if text:
-            alert_success(f"文本提取完成（{len(text):,} 字符）。选下面任一方式解析：")
+            alert_success(f"文本提取完成（{len(text):,} 字符）。系统会先自动规则解析并保存；也可以手动重跑或用 AI 覆盖。")
 
-            _apply_parsed = lambda parsed: st.session_state.__setitem__(
-                "master_data",
-                {
+            def _apply_parsed(parsed: dict, *, persist: bool = True) -> None:
+                st.session_state["master_data"] = {
                     "id":          (st.session_state.get("master_data") or {}).get("id"),
                     "basics":      parsed["basics"],
                     "profile":     {"pool": [{"id": "default", "tags": [], "text": parsed.get("profile") or ""}], "default": "default"},
@@ -418,14 +433,56 @@ with tab_upload:
                     "internships": parsed.get("internships") or [],
                     "skills":      parsed.get("skills") or [],
                     "education":   parsed.get("education") or [],
-                },
-            )
+                }
+                clear_tailor_state_after_master_change()
+                if persist:
+                    save_master(st.session_state["master_data"])
+                    st.session_state["master_data"] = load_master()
+
+            def _parse_summary(parsed: dict) -> tuple[str, bool]:
+                n_proj = len(parsed.get("projects", []))
+                n_intern = len(parsed.get("internships", []))
+                n_skills = len(parsed.get("skills", []))
+                n_edu = len(parsed.get("education", []))
+                name_ok = bool(parsed["basics"].get("name"))
+                low_quality = (not name_ok) or (n_proj + n_intern == 0) or (n_edu == 0)
+                summary = (
+                    f"识别到 姓名「{parsed['basics'].get('name') or '未识别'}」· "
+                    f"{n_proj} 个项目 · {n_intern} 段经历 · {n_skills} 类技能 · {n_edu} 段教育"
+                )
+                return summary, low_quality
+
+            file_sig = hashlib.sha256(f"{f.name}:{f.size}:{text}".encode("utf-8")).hexdigest()
+            if st.session_state.get("_resume_upload_auto_parse_sig") != file_sig:
+                try:
+                    from services.resume_rule_parser import parse_resume_text as rule_parse
+                    parsed = rule_parse(text)
+                    _apply_parsed(parsed)
+                    summary, low_quality = _parse_summary(parsed)
+                    st.session_state["_resume_upload_auto_parse_sig"] = file_sig
+                    st.session_state["_resume_upload_auto_parse_message"] = (summary, low_quality)
+                    st.rerun()
+                except Exception as e:
+                    alert_danger(f"自动规则解析失败：{type(e).__name__}: {e}")
+
+            if st.session_state.get("_resume_upload_auto_parse_message"):
+                summary, low_quality = st.session_state["_resume_upload_auto_parse_message"]
+                if low_quality:
+                    alert_warning(
+                        f"自动规则解析识别率较低。{summary}。\n\n"
+                        f"建议使用「AI 智能解析并保存」覆盖。"
+                    )
+                else:
+                    alert_success(
+                        f"自动规则解析完成并已写入数据库。{summary}。"
+                        f"在线定制编辑会立即使用这份新主简历。"
+                    )
 
             col_rule, col_ai = st.columns(2)
 
             # ── 规则解析（默认推荐 · 不用 API）──
             with col_rule:
-                if st.button("⚡ 规则解析并填入字段", type="primary", key="rule_parse_resume",
+                if st.button("重新规则解析并保存", type="primary", key="rule_parse_resume",
                              use_container_width=True,
                              help="纯正则 + 关键词识别，不调 API，瞬间出结果"):
                     try:
@@ -435,31 +492,21 @@ with tab_upload:
                         _apply_parsed(parsed)
 
                         # 规则解析质量自检
-                        n_proj = len(parsed.get('projects', []))
-                        n_intern = len(parsed.get('internships', []))
-                        n_skills = len(parsed.get('skills', []))
-                        n_edu = len(parsed.get('education', []))
-                        name_ok = bool(parsed['basics'].get('name'))
-                        low_quality = (not name_ok) or (n_proj + n_intern == 0) or (n_edu == 0)
-
-                        summary = (
-                            f"识别到 姓名「{parsed['basics'].get('name') or '未识别'}」· "
-                            f"{n_proj} 个项目 · {n_intern} 段经历 · {n_skills} 类技能 · {n_edu} 段教育"
-                        )
+                        summary, low_quality = _parse_summary(parsed)
 
                         if low_quality:
                             # 关键字段缺失 → 显著提示用户切到 AI 兜底
                             st.session_state["_rule_parse_low_quality"] = True
                             alert_warning(
-                                f"⚠️ 规则解析识别率较低。{summary}。\n\n"
-                                f"**建议点右侧「🤖 AI 智能解析」用 Claude 兜底**"
+                                f"规则解析识别率较低。{summary}。\n\n"
+                                f"**建议点右侧「AI 智能解析」用 Claude 兜底**"
                                 f"（规则解析对非标准格式简历覆盖有限）。"
                             )
                         else:
                             st.session_state["_rule_parse_low_quality"] = False
                             alert_success(
-                                f"✓ 规则解析完成。{summary}。"
-                                f"**切到其他 tab 校对；顶部「保存全部」才真正落库。**"
+                                f"规则解析完成并已写入数据库。{summary}。"
+                                f"现在去「在线定制编辑」会使用这份新主简历。"
                             )
                         st.rerun()
                     except Exception as e:
@@ -467,7 +514,7 @@ with tab_upload:
 
             # ── AI 解析（fallback · 规则没识别出再用）──
             with col_ai:
-                if st.button("🤖 AI 智能解析（更精准）", key="ai_parse_resume",
+                if st.button("AI 智能解析并保存", key="ai_parse_resume",
                              use_container_width=True,
                              disabled=not settings.has_anthropic_key,
                              help="调 Claude 做结构化，对非标准简历更可靠，耗 1-2 次 API 调用"):
@@ -477,7 +524,7 @@ with tab_upload:
                             parsed = ai_parse(text)
                         _apply_parsed(parsed)
                         alert_success(
-                            f"✓ AI 解析完成。识别到 "
+                            f"AI 解析完成并已写入数据库。识别到 "
                             f"{len(parsed['projects'])} 个项目 · "
                             f"{len(parsed['internships'])} 段实习 · "
                             f"{len(parsed['skills'])} 类技能 · "
@@ -497,6 +544,6 @@ with tab_upload:
 # ── 底部全局提示 ────────────────────────────────────────────
 divider()
 st.caption(
-    "页面上的所有修改在内存里。**点顶部「保存全部」才会落库**。"
-    " 保存前如需放弃改动，点「重新加载」。"
+    "手动编辑字段后需点顶部「保存全部」落库；上传文件解析会自动保存。"
+    " 如需放弃未保存的手动改动，点「重新加载」。"
 )
