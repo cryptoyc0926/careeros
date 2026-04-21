@@ -27,6 +27,27 @@ load_dotenv(_ROOT / ".env", override=True)
 # 用户画像文件位置（相对项目根上一级）
 _USER_PROFILE_PATH = (_ROOT.parent / "data" / "user_profile.yaml")
 _USER_PROFILE_EXAMPLE = (_ROOT.parent / "data" / "user_profile.example.yaml")
+_STREAMLIT_SECRET_FILES = (
+    Path.home() / ".streamlit" / "secrets.toml",
+    _ROOT / ".streamlit" / "secrets.toml",
+)
+
+
+def _streamlit_secret(key: str, default: str = "") -> str:
+    """Read st.secrets without triggering local missing-secrets path warnings."""
+    env_value = os.getenv(key, "")
+    if env_value:
+        return env_value
+    is_cloud = str(_ROOT).startswith("/mount/src/") or bool(
+        os.getenv("SPACE_ID") or os.getenv("SPACE_AUTHOR_NAME")
+    )
+    if not is_cloud and not any(p.exists() for p in _STREAMLIT_SECRET_FILES):
+        return default
+    try:
+        import streamlit as st
+        return str(st.secrets.get(key, default) or default)
+    except Exception:
+        return default
 
 
 class Settings:
@@ -102,30 +123,17 @@ class Settings:
     @property
     def codex_shared_key(self) -> str:
         """Streamlit Cloud Secrets 里配的公开池 Key。用户没填自己 Key 且选 codex 时用此 Key。"""
-        # st.secrets 在本地无 secrets.toml 时会 raise；做防御性读取
-        try:
-            import streamlit as st
-            return str(st.secrets.get("CODEX_SHARED_KEY", "") or "")
-        except Exception:
-            return os.getenv("CODEX_SHARED_KEY", "")
+        return _streamlit_secret("CODEX_SHARED_KEY", "")
 
     @property
     def codex_pool_monthly_budget_usd(self) -> float:
         """公开池月预算上限（美元）。超过就禁用公开池。"""
-        try:
-            import streamlit as st
-            return float(st.secrets.get("CODEX_POOL_BUDGET_USD", 10.0) or 10.0)
-        except Exception:
-            return float(os.getenv("CODEX_POOL_BUDGET_USD", "10.0") or 10.0)
+        return float(_streamlit_secret("CODEX_POOL_BUDGET_USD", "10.0") or 10.0)
 
     @property
     def codex_per_session_budget_usd(self) -> float:
         """单个访客 session 级预算上限。"""
-        try:
-            import streamlit as st
-            return float(st.secrets.get("CODEX_PER_SESSION_USD", 0.5) or 0.5)
-        except Exception:
-            return float(os.getenv("CODEX_PER_SESSION_USD", "0.5") or 0.5)
+        return float(_streamlit_secret("CODEX_PER_SESSION_USD", "0.5") or 0.5)
 
     # ── Email (SMTP) ────────────────────────────────────────
     @property
