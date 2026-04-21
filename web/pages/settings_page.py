@@ -199,11 +199,17 @@ with st.form("api_config"):
     _p = _PROVIDERS[provider]
     st.caption(f"💡 {_p['hint']}" + (f" [申请 Key →]({_p['key_link']})" if _p["key_link"] else ""))
 
+    # 安全：永不把真实 Key 预填到 input value（DOM 可读）
+    # 显示当前状态 + 掩码；用户留空则保留，输入新值才覆盖
+    _existing_key = st.session_state.get("ANTHROPIC_API_KEY") or current_env.get("ANTHROPIC_API_KEY", "")
+    if _existing_key:
+        st.caption(f"当前 Key：`{settings.masked_key(_existing_key)}` · 留空保持不变，输入新 Key 覆盖")
     api_key = st.text_input(
         "API Key",
-        value=st.session_state.get("ANTHROPIC_API_KEY") or current_env.get("ANTHROPIC_API_KEY", ""),
+        value="",
         type="password",
-        help="粘贴从上面链接申请到的 Key。BYO-Key 模式下只存在当前浏览器会话。",
+        placeholder="粘贴新 Key 或留空保持当前 Key",
+        help="BYO-Key 模式下只存在当前浏览器会话。留空保持现有 Key；输入非空值才会覆盖。",
     )
     base_url = st.text_input(
         "API 端点（base_url）",
@@ -221,8 +227,11 @@ with st.form("api_config"):
     if st.form_submit_button("保存 API 配置", type="primary"):
         # BYO-Key / DEMO_MODE：只写 session_state（云端 FS 只读）
         # 本地模式：同时写 session_state + .env（永久保存）
+        # API Key 特殊处理：留空保持现有，输入非空值才覆盖
+        _api_key_effective = api_key.strip() if api_key and api_key.strip() else _existing_key
+
         st.session_state["LLM_PROVIDER"]      = provider
-        st.session_state["ANTHROPIC_API_KEY"] = api_key
+        st.session_state["ANTHROPIC_API_KEY"] = _api_key_effective
         st.session_state["ANTHROPIC_BASE_URL"] = base_url
         st.session_state["CLAUDE_MODEL"]      = model
 
@@ -230,7 +239,7 @@ with st.form("api_config"):
         if _can_write_env:
             try:
                 current_env["LLM_PROVIDER"]       = provider
-                current_env["ANTHROPIC_API_KEY"]  = api_key
+                current_env["ANTHROPIC_API_KEY"]  = _api_key_effective
                 current_env["ANTHROPIC_BASE_URL"] = base_url
                 current_env["CLAUDE_MODEL"]      = model
                 _write_env(current_env)
@@ -299,13 +308,23 @@ with st.form("smtp_config"):
     smtp_host = st.text_input("SMTP 服务器", value=current_env.get("SMTP_HOST", "smtp.gmail.com"))
     smtp_port = st.text_input("SMTP 端口", value=current_env.get("SMTP_PORT", "587"))
     smtp_user = st.text_input("SMTP 用户名（邮箱地址）", value=current_env.get("SMTP_USER", ""))
-    smtp_pass = st.text_input("SMTP 密码 / 应用专用密码", value=current_env.get("SMTP_PASSWORD", ""), type="password")
+    # 安全：SMTP 密码同样不预填真实值
+    _existing_smtp_pass = current_env.get("SMTP_PASSWORD", "")
+    if _existing_smtp_pass:
+        st.caption(f"当前密码：`{settings.masked_key(_existing_smtp_pass)}` · 留空保持不变，输入新密码覆盖")
+    smtp_pass = st.text_input(
+        "SMTP 密码 / 应用专用密码",
+        value="",
+        type="password",
+        placeholder="粘贴新密码或留空保持当前密码",
+    )
 
     if st.form_submit_button("保存邮件配置"):
         current_env["SMTP_HOST"] = smtp_host
         current_env["SMTP_PORT"] = smtp_port
         current_env["SMTP_USER"] = smtp_user
-        current_env["SMTP_PASSWORD"] = smtp_pass
+        # 留空保留现有密码
+        current_env["SMTP_PASSWORD"] = smtp_pass.strip() if smtp_pass and smtp_pass.strip() else _existing_smtp_pass
         _write_env(current_env)
         alert_success("SMTP 配置已保存，重启应用后生效。")
 
