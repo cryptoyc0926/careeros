@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import sqlite3
 import tempfile
 from pathlib import Path
@@ -534,9 +535,25 @@ with tab_preview:
 
     st.markdown("##### 系统生成的新 PDF（基于模板）")
 
-    try:
-        pdf_bytes = resume_renderer.render_pdf_bytes(st.session_state.tailor_data)
+    preview_key = hashlib.sha256(
+        json.dumps(st.session_state.tailor_data, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    cached_key = st.session_state.get("_tailor_preview_key")
+    pdf_bytes = st.session_state.get("_tailor_preview_pdf") if cached_key == preview_key else None
 
+    if st.button("生成预览", type="primary", use_container_width=True):
+        try:
+            with st.spinner("正在生成 PDF 预览..."):
+                pdf_bytes = resume_renderer.render_pdf_bytes(st.session_state.tailor_data)
+            st.session_state["_tailor_preview_key"] = preview_key
+            st.session_state["_tailor_preview_pdf"] = pdf_bytes
+        except Exception as e:
+            pdf_bytes = None
+            alert_danger(f"预览渲染失败：{e}")
+
+    if pdf_bytes is None:
+        st.caption("点击「生成预览」后才会生成 PDF，避免每次打开页面都触发渲染。")
+    else:
         # 转 PNG 预览
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tf:
             tf.write(pdf_bytes)
@@ -594,6 +611,3 @@ with tab_preview:
                 conn.close()
                 alert_success(f"已保存：{v_name}")
                 st.rerun()
-
-    except Exception as e:
-        alert_danger(f"预览渲染失败：{e}")
