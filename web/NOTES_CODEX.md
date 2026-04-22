@@ -48,3 +48,4 @@
 2026-04-22T14:05:20-0600 · codex · L-1 · DONE · landing.py Hero/topbar 对齐 Image 2，nav/禁项/双面板/Fancy Tech 高亮 Playwright 验收通过
 2026-04-22T14:27:22-0600 · codex · L-1-REV · DONE · 修正 Hero mock 4 处 OCR 偏差：项目/实习按钮去「重写」、JD 改「岗位要求」、3 条 JD 文案替换、地点/经验/学历改独立 chip；py_compile + Chrome AX 验收通过
 2026-04-22T14:49:59-0600 · codex · L-2 · DONE · AI Chat section 已按 Image 3 重写：助手面板、diff 红绿预览、4 feature chips、只读完整简历预览；py_compile + Chrome AX/样式截图验收通过，待 Claude preview 裁决后再 commit
+2026-04-22T15:06:37-0600 · codex · L-3 · DONE · Kanban section 已按 Image 4 重写：视觉 sidebar mock、4 列看板、百度 JD drawer；py_compile + Chrome DOM/布局截图验收通过，未改真实路由，待 Claude preview 裁决后再 commit

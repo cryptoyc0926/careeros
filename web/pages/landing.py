@@ -572,102 +572,273 @@ def _section_ai_chat() -> None:
 # =========================================================================
 # Section 3 — Kanban
 # =========================================================================
+def _kanban_sidebar_mock() -> str:
+    menu_items = [
+        ("🏠", "首页", False, None),
+        ("📋", "职位管理", True, None),
+        ("📄", "JD 管理", False, None),
+        ("👤", "投递追踪", False, None),
+        ("🎤", "面试管理", False, None),
+        ("📑", "Offer 管理", False, None),
+        ("📝", "简历与模板", False, None),
+        ("📊", "数据分析", False, None),
+    ]
+    rows = ""
+    for icon, label, active, badge in menu_items:
+        rows += (
+            f'<div style="display:flex;align-items:center;gap:9px;padding:8px 10px;'
+            f'border-radius:10px;background:{C_PRIMARY_SOFT if active else "transparent"};'
+            f'color:{C_PRIMARY_INK if active else C_INK_SUB};font-size:12.5px;'
+            f'font-weight:{700 if active else 500};margin-bottom:2px;">'
+            f'<span style="width:18px;text-align:center;">{icon}</span>'
+            f'<span>{_html.escape(label)}</span>'
+            f'{badge or ""}'
+            f'</div>'
+        )
+    return (
+        f'<div style="background:#fff;border:1px solid {C_BORDER};border-radius:16px;'
+        f'box-shadow:{S_MD};padding:16px 14px;min-height:620px;display:flex;'
+        f'flex-direction:column;min-width:0;">'
+        f'<div style="display:flex;align-items:center;gap:9px;margin-bottom:18px;padding:0 4px;">'
+        f'<span style="display:inline-flex;width:28px;height:28px;border-radius:8px;'
+        f'background:{C_PRIMARY};color:#fff;align-items:center;justify-content:center;'
+        f'font-size:13px;font-weight:800;">C</span>'
+        f'<span style="font-size:15px;font-weight:800;color:{C_INK};">CareerOS</span>'
+        f'</div>'
+        f'{rows}'
+        f'<div style="height:1px;background:{C_BORDER};margin:12px 4px;"></div>'
+        f'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;'
+        f'padding:8px 10px;border-radius:10px;color:{C_INK_SUB};font-size:12.5px;">'
+        f'<span style="display:flex;align-items:center;gap:9px;"><span style="width:18px;text-align:center;">💡</span>AI 助手</span>'
+        f'<span style="background:{C_PRIMARY_SOFT};color:{C_PRIMARY_INK};'
+        f'border-radius:999px;padding:1px 7px;font-size:10.5px;font-weight:700;">Beta</span>'
+        f'</div>'
+        f'<div style="display:flex;align-items:center;gap:9px;padding:8px 10px;'
+        f'border-radius:10px;color:{C_INK_SUB};font-size:12.5px;">'
+        f'<span style="width:18px;text-align:center;">⚙</span><span>设置</span></div>'
+        f'<div style="height:1px;background:{C_BORDER};margin:12px 4px;"></div>'
+        f'<div style="margin-top:auto;display:flex;align-items:center;gap:9px;'
+        f'padding:10px;border-radius:12px;background:{C_BG_SOFT};">'
+        f'<span style="display:inline-flex;width:30px;height:30px;border-radius:50%;'
+        f'background:{C_PRIMARY};color:#fff;align-items:center;justify-content:center;'
+        f'font-size:12px;font-weight:800;">Y</span>'
+        f'<span style="min-width:0;display:flex;flex-direction:column;">'
+        f'<span style="font-size:12.5px;font-weight:700;color:{C_INK};">杨超</span>'
+        f'<span style="font-size:11px;color:{C_INK_MUTE};">个人版 ▾</span>'
+        f'</span></div></div>'
+    )
+
+
 def _kanban_mock() -> str:
+    def card(
+        color: str,
+        logo: str,
+        company: str,
+        role: str,
+        location: str,
+        tags: list[str],
+        meta: str,
+        match: str,
+    ) -> str:
+        tag_html = ''.join(
+            f'<span style="background:{C_BG_MUTED};color:{C_INK_SUB};border-radius:999px;'
+            f'padding:2px 7px;font-size:10.5px;font-weight:600;">{_html.escape(tag)}</span>'
+            for tag in tags
+        )
+        return (
+            f'<div style="background:#fff;border:1px solid {C_BORDER};border-radius:12px;'
+            f'padding:11px 12px;margin-bottom:10px;box-shadow:0 1px 2px rgba(11,18,32,.06);">'
+            f'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px;">'
+            f'<div style="display:flex;align-items:center;gap:8px;min-width:0;">'
+            f'<span style="display:inline-flex;width:28px;height:28px;border-radius:8px;'
+            f'background:{color};color:#fff;align-items:center;justify-content:center;'
+            f'font-size:12px;font-weight:800;flex-shrink:0;">{_html.escape(logo)}</span>'
+            f'<span style="font-size:12.5px;font-weight:800;color:{C_INK};white-space:nowrap;'
+            f'overflow:hidden;text-overflow:ellipsis;">{_html.escape(company)}</span>'
+            f'</div>'
+            f'<span style="font-size:11px;color:{C_PRIMARY_INK};font-weight:800;white-space:nowrap;">{_html.escape(match)}</span>'
+            f'</div>'
+            f'<div style="font-size:12.5px;color:{C_INK};font-weight:700;line-height:1.35;margin-bottom:3px;">'
+            f'{_html.escape(role)}</div>'
+            f'<div style="font-size:11px;color:{C_INK_MUTE};margin-bottom:8px;">{_html.escape(location)}</div>'
+            f'<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;">{tag_html}</div>'
+            f'<div style="font-size:11px;color:{C_INK_MUTE};line-height:1.4;">{_html.escape(meta)}</div>'
+            f'</div>'
+        )
+
     cols_data = [
-        ("意向", 4, C_INK_MUTE,
-         [("MiniMax", "增长运营", "杭州"),
-          ("Kimi", "KOL 运营", "北京"),
-          ("智谱 AI", "产品运营", "北京"),
-          ("LiblibAI", "AI 运营", "杭州")]),
-        ("联系", 3, C_WARN,
-         [("DeepSeek", "AI PM", "杭州"),
-          ("昆仑万维", "产品增长", "北京"),
-          ("Talkie", "海外运营", "远程")]),
-        ("已面试", 2, C_PRIMARY,
-         [("MiniMax 星野", "增长运营", "92 分"),
-          ("Fancy Tech", "海外运营", "88 分")]),
-        ("面试中", 2, C_PRIMARY_INK,
-         [("同花顺 iFind", "需求分析师", "2 轮"),
-          ("杭银消金", "产品运营", "3 轮")]),
-        ("Offer", 1, C_SUCCESS,
-         [("某 AI 创业", "增长运营", "Offer ✓")]),
+        (
+            "待投递", 8, C_INK_MUTE, "更多 待投递 (5)", False,
+            [
+                ("#FF6900", "米", "小米科技", "AI 产品经理", "北京市·海淀区", ["产品", "AI"], "", "92%"),
+                ("#E94B35", "字", "字节跳动", "内容策略产品经理", "北京市·海淀区", ["内容", "策略"], "", "88%"),
+                ("#FFC600", "美", "美团", "增长产品经理", "上海市·长宁区", ["增长", "用户运营"], "", "85%"),
+            ],
+        ),
+        (
+            "已投递", 12, C_PRIMARY, "更多 已投递 (9)", False,
+            [
+                ("#00A4FF", "腾", "腾讯云", "AI 产品经理", "深圳市·南山区", ["云计算", "AI"], "投递于 2 天前", "90%"),
+                ("#FF6A00", "阿", "阿里巴巴", "产品经理", "杭州市·余杭区", ["电商", "平台"], "投递于 5 天前", "87%"),
+                ("#D91E18", "网", "网易", "数据产品经理", "杭州市·滨江区", ["数据", "BI"], "投递于 1 周前", "82%"),
+            ],
+        ),
+        (
+            "面试中", 5, C_PRIMARY_INK, "更多 面试中 (2)", False,
+            [
+                ("#2319DC", "百", "百度", "AI 产品经理（NLP 方向）", "北京市·海淀区", ["NLP", "AI"], "面·进行中", "93%"),
+                ("#FE3366", "快", "快手", "策略产品经理", "北京市·海淀区", ["策略", "社区"], "面·预约中", "88%"),
+                ("#2577E3", "携", "携程", "产品经理", "上海市·浦东新区", ["旅游", "平台"], "面·进行中", "86%"),
+            ],
+        ),
+        (
+            "Offer", 2, C_SUCCESS, "+ 添加到 Offer", True,
+            [
+                ("#E2231A", "京", "京东", "高级产品经理", "北京市·大兴区", ["电商"], "✅ Offer 已接受", "91%"),
+                ("#FF6D0C", "滴", "滴滴", "产品经理", "北京市·海淀区", ["出行"], "✅ Offer 已接受", "89%"),
+            ],
+        ),
     ]
     col_blocks = []
-    for title, count, color, cards in cols_data:
-        cards_html = ""
-        for name, role, tag in cards:
-            cards_html += (
-                f'<div style="background:#fff;border:1px solid {C_BORDER};border-radius:10px;'
-                f'padding:10px 12px;margin-bottom:8px;box-shadow:0 1px 2px rgba(11,18,32,.06);">'
-                f'<div style="font-weight:600;font-size:13px;color:{C_INK};margin-bottom:2px;">{_html.escape(name)}</div>'
-                f'<div style="font-size:11.5px;color:{C_INK_SUB};margin-bottom:6px;">{_html.escape(role)}</div>'
-                f'<span style="display:inline-block;background:{C_BG_MUTED};color:{C_INK_SUB};'
-                f'padding:1px 8px;border-radius:999px;font-size:10.5px;">{_html.escape(tag)}</span>'
-                f'</div>'
-            )
+    for title, count, color, more_text, dashed, cards in cols_data:
+        cards_html = ''.join(card(*item) for item in cards)
+        footer = (
+            f'<div style="border:1px dashed {C_BORDER};border-radius:10px;padding:9px 10px;'
+            f'text-align:center;color:{C_INK_SUB};font-size:11.5px;font-weight:700;background:#fff;">'
+            f'{_html.escape(more_text)}</div>'
+            if dashed else
+            f'<div style="text-align:center;color:{C_PRIMARY_INK};font-size:11.5px;'
+            f'font-weight:700;padding:7px 4px;">{_html.escape(more_text)}</div>'
+        )
         col_blocks.append(
-            f'<div style="min-width:0;">'
-            f'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
+            f'<div style="min-width:0;background:{C_BG_SOFT};border-radius:14px;padding:12px 10px;">'
+            f'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
             f'<div style="display:flex;align-items:center;gap:6px;">'
             f'<span style="width:8px;height:8px;border-radius:50%;background:{color};"></span>'
-            f'<span style="font-size:12.5px;font-weight:600;color:{C_INK};">{title}</span>'
+            f'<span style="font-size:12.5px;font-weight:800;color:{C_INK};">{_html.escape(title)}</span>'
             f'</div>'
-            f'<span style="font-size:11px;color:{C_INK_MUTE};background:{C_BG_MUTED};'
+            f'<span style="font-size:11px;color:{C_INK_MUTE};background:#fff;'
             f'padding:1px 7px;border-radius:999px;">{count}</span>'
             f'</div>'
             f'{cards_html}'
+            f'{footer}'
             f'</div>'
         )
     return (
         f'<div style="background:#fff;border:1px solid {C_BORDER};border-radius:14px;'
-        f'box-shadow:{S_MD};padding:20px;">'
+        f'box-shadow:{S_MD};padding:18px;min-width:0;">'
         f'<div style="display:flex;align-items:center;justify-content:space-between;'
         f'margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid {C_BORDER};">'
-        f'<div style="display:flex;align-items:center;gap:10px;">'
-        f'<span style="display:inline-flex;width:26px;height:26px;border-radius:7px;'
-        f'background:{C_PRIMARY};color:#fff;align-items:center;justify-content:center;'
-        f'font-size:13px;font-weight:800;">C</span>'
-        f'<span style="font-weight:700;color:{C_INK};">我的投递</span>'
+        f'<div style="font-weight:800;color:{C_INK};font-size:15px;">我的投递看板 ▾</div>'
+        f'<div style="display:flex;align-items:center;gap:8px;">'
+        f'<span style="display:inline-flex;align-items:center;gap:6px;background:{C_BG_SOFT};'
+        f'border:1px solid {C_BORDER};border-radius:10px;padding:7px 12px;'
+        f'color:{C_INK_MUTE};font-size:12px;min-width:190px;">🔍 搜索岗位 / 公司 / JD 关键词</span>'
+        f'<span style="background:{C_PRIMARY};color:#fff;padding:7px 12px;'
+        f'border-radius:9px;font-size:12px;font-weight:700;white-space:nowrap;">+ 添加职位</span>'
+        f'<span style="display:inline-flex;width:30px;height:30px;border:1px solid {C_BORDER};'
+        f'border-radius:9px;align-items:center;justify-content:center;color:{C_INK_SUB};">≡</span>'
         f'</div>'
-        f'<span style="background:{C_PRIMARY};color:#fff;padding:5px 12px;'
-        f'border-radius:8px;font-size:12px;font-weight:600;">+ 添加职位</span>'
         f'</div>'
-        f'<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;">'
+        f'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">'
         f'{"".join(col_blocks)}'
         f'</div></div>'
     )
 
 
-def _ai_pm_todo(text: str) -> str:
-    return (
-        f'<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px;'
-        f'font-size:12.5px;color:{C_INK_SUB};line-height:1.55;">'
-        f'<span style="display:inline-flex;flex-shrink:0;width:14px;height:14px;margin-top:2px;'
-        f'border:1.5px solid {C_BORDER};border-radius:3px;"></span>'
-        f'<span>{_html.escape(text)}</span></div>'
-    )
-
-
 def _ai_pm_drawer_mock() -> str:
+    def info_row(label: str, value: str) -> str:
+        return (
+            f'<div style="display:grid;grid-template-columns:72px 1fr;gap:8px;'
+            f'font-size:11.5px;line-height:1.55;margin-bottom:7px;">'
+            f'<span style="color:{C_INK_MUTE};font-weight:700;">{_html.escape(label)}</span>'
+            f'<span style="color:{C_INK_SUB};">{_html.escape(value)}</span>'
+            f'</div>'
+        )
+
+    def bullet(text: str) -> str:
+        return (
+            f'<div style="display:flex;gap:7px;align-items:flex-start;font-size:11.5px;'
+            f'line-height:1.55;color:{C_INK_SUB};margin-bottom:6px;">'
+            f'<span style="color:{C_PRIMARY};font-weight:900;">•</span>'
+            f'<span>{_html.escape(text)}</span></div>'
+        )
+
+    def match_row(text: str, status: str, partial: bool = False) -> str:
+        chip_bg = "#FFFBEB" if partial else C_SUCCESS_SOFT
+        chip_fg = C_WARN if partial else C_SUCCESS
+        return (
+            f'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;'
+            f'font-size:11.5px;color:{C_INK_SUB};margin-top:7px;">'
+            f'<span>✓ {_html.escape(text)}</span>'
+            f'<span style="background:{chip_bg};color:{chip_fg};border-radius:999px;'
+            f'padding:2px 8px;font-size:10.5px;font-weight:800;white-space:nowrap;">{_html.escape(status)}</span>'
+            f'</div>'
+        )
+
     return (
         f'<div style="background:#fff;border:1px solid {C_BORDER};border-radius:14px;'
-        f'box-shadow:{S_MD};padding:18px 20px;">'
-        f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">'
-        f'<span style="display:inline-flex;width:28px;height:28px;border-radius:8px;'
-        f'background:{C_PRIMARY_SOFT};color:{C_PRIMARY_INK};'
-        f'align-items:center;justify-content:center;font-size:14px;">🧭</span>'
-        f'<span style="font-weight:700;color:{C_INK};font-size:14px;">AI 产品经理</span>'
+        f'box-shadow:{S_MD};padding:18px 18px;min-width:0;">'
+        f'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:14px;">'
+        f'<div style="display:flex;align-items:center;gap:10px;min-width:0;">'
+        f'<span style="display:inline-flex;width:34px;height:34px;border-radius:10px;'
+        f'background:#2319DC;color:#fff;align-items:center;justify-content:center;'
+        f'font-size:14px;font-weight:900;flex-shrink:0;">B</span>'
+        f'<span style="min-width:0;display:flex;flex-direction:column;gap:2px;">'
+        f'<span style="font-size:17px;font-weight:900;color:{C_INK};">AI 产品经理</span>'
+        f'<span style="font-size:11.5px;color:{C_INK_MUTE};">北京市·海淀区</span>'
+        f'</span></div>'
+        f'<span style="color:{C_INK_MUTE};font-size:18px;line-height:1;">×</span>'
         f'</div>'
-        f'<div style="font-size:12.5px;color:{C_INK_SUB};'
-        f'background:{C_BG_SOFT};border-radius:10px;padding:12px 14px;line-height:1.6;margin-bottom:12px;">'
-        f'当前追踪 <b style="color:{C_INK};">MiniMax 星野 · 增长运营</b><br/>'
-        f'匹配度 <b style="color:{C_PRIMARY_INK};">92</b>，建议 2 天内跟进一轮面试反馈。'
+        f'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;'
+        f'border-bottom:1px solid {C_BORDER};margin-bottom:14px;">'
+        f'<span style="text-align:center;padding:8px 0;color:{C_PRIMARY_INK};'
+        f'border-bottom:2px solid {C_PRIMARY};font-size:11.5px;font-weight:800;">JD 详情</span>'
+        f'<span style="text-align:center;padding:8px 0;color:{C_INK_MUTE};font-size:11.5px;font-weight:700;">匹配分析</span>'
+        f'<span style="text-align:center;padding:8px 0;color:{C_INK_MUTE};font-size:11.5px;font-weight:700;">投递记录</span>'
+        f'<span style="text-align:center;padding:8px 0;color:{C_INK_MUTE};font-size:11.5px;font-weight:700;">面试流程</span>'
         f'</div>'
-        f'<div style="font-size:12px;color:{C_INK_MUTE};margin-bottom:8px;">建议动作</div>'
-        f'{_ai_pm_todo("补一版星野专属简历（重点：Telegram 社群 1300 人）")}'
-        f'{_ai_pm_todo("联系 HR Amanda 确认 HM 面试时间")}'
-        f'{_ai_pm_todo("准备 30min 作品集 demo（BTC 做市策略）")}'
+        f'<div style="font-size:13px;font-weight:900;color:{C_INK};margin-bottom:10px;">JD 核心信息</div>'
+        f'{info_row("职位亮点", "负责百度 AI 搜索产品设计与迭代，探索大模型应用落地")}'
+        f'{info_row("团队方向", "搜索体验 · 大模型应用 · 智能体产品")}'
+        f'{info_row("汇报对象", "产品总监")}'
+        f'{info_row("工作地点", "北京市 · 海淀区")}'
+        f'{info_row("发布时间", "2025-05-20")}'
+        f'<div style="font-size:13px;font-weight:900;color:{C_INK};margin:14px 0 8px;">岗位职责</div>'
+        f'{bullet("负责 AI 搜索产品的需求分析、产品设计与项目推进")}'
+        f'{bullet("结合大模型能力，探索创新的搜索体验与交互方式")}'
+        f'{bullet("与研发、算法团队协作，推动产品落地与能力提升")}'
+        f'{bullet("通过数据分析持续优化产品体验与核心指标")}'
+        f'<div style="font-size:13px;font-weight:900;color:{C_INK};margin:14px 0 8px;">任职要求</div>'
+        f'{bullet("3 年以上产品经验，有 AI / 搜索 / NLP 相关经验优先")}'
+        f'{bullet("熟悉大模型应用场景，有 Prompt / Agent 项目经验优先")}'
+        f'{bullet("优秀的用户洞察与产品设计能力，数据驱动")}'
+        f'{bullet("本科以上学历，计算机、产品相关专业优先")}'
+        f'<div style="border:1px solid {C_BORDER};border-radius:13px;background:{C_BG_SOFT};'
+        f'padding:13px 13px;margin-top:14px;">'
+        f'<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">'
+        f'<span style="display:inline-flex;width:64px;height:64px;border-radius:50%;'
+        f'background:conic-gradient({C_PRIMARY} 0 93%, {C_BG_MUTED} 93% 100%);'
+        f'align-items:center;justify-content:center;position:relative;flex-shrink:0;">'
+        f'<span style="display:inline-flex;width:50px;height:50px;border-radius:50%;background:#fff;'
+        f'align-items:center;justify-content:center;color:{C_PRIMARY_INK};font-size:16px;font-weight:900;">93%</span>'
+        f'</span>'
+        f'<span style="display:flex;flex-direction:column;gap:3px;">'
+        f'<span style="font-size:13px;font-weight:900;color:{C_INK};">高度匹配</span>'
+        f'<span style="font-size:11.5px;color:{C_INK_SUB};line-height:1.45;">你的简历与该岗位要求高度契合</span>'
+        f'</span></div>'
+        f'{match_row("3 年以上产品经验", "匹配")}'
+        f'{match_row("AI / 大模型相关经验", "匹配")}'
+        f'{match_row("产品设计与项目推进", "匹配")}'
+        f'{match_row("数据分析能力", "匹配")}'
+        f'{match_row("搜索产品经验", "部分匹配", True)}'
         f'</div>'
+        f'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;">'
+        f'<span style="text-align:center;border:1px solid {C_BORDER};border-radius:10px;'
+        f'padding:9px 10px;font-size:12.5px;font-weight:800;color:{C_INK_SUB};background:#fff;">编辑 JD</span>'
+        f'<span style="text-align:center;border-radius:10px;padding:9px 10px;'
+        f'font-size:12.5px;font-weight:800;color:#fff;background:{C_PRIMARY};">去投递</span>'
+        f'</div></div>'
     )
 
 
@@ -675,16 +846,20 @@ def _section_kanban() -> None:
     _h(
         f'<div id="feature-2" style="padding:96px 56px;background:{C_BG_SOFT};">'
         f'<div style="max-width:1280px;margin:0 auto;text-align:center;">'
+        f'<div style="display:inline-flex;align-items:center;gap:6px;'
+        f'background:{C_PRIMARY_SOFT};color:{C_PRIMARY_INK};'
+        f'padding:5px 12px;border-radius:999px;font-size:12px;'
+        f'font-weight:700;margin-bottom:18px;">🔵 AI 求职操作系统</div>'
         f'<h2 style="font-size:44px;font-weight:800;color:{C_INK};line-height:1.2;'
         f'margin:0 0 14px 0;letter-spacing:-0.02em;">'
         f'从岗位到投递，<span style="color:{C_PRIMARY};">全</span>流程追踪</h2>'
         f'<p style="font-size:16px;color:{C_INK_SUB};margin:0 auto 48px auto;'
-        f'max-width:560px;line-height:1.6;">'
-        f'JD 管理 · 智能匹配 · 投递跟踪 · 面试复盘 · Offer 记录，一站式求职协同'
+        f'max-width:620px;line-height:1.6;">'
+        f'JD 管理 · 智能匹配 · 投递追踪 · 面试管理 · Offer 记录，一站式求职闭环'
         f'</p></div>'
         f'<div style="max-width:1280px;margin:0 auto;display:grid;'
-        f'grid-template-columns:7fr 3fr;gap:24px;">'
-        f'{_kanban_mock()}{_ai_pm_drawer_mock()}'
+        f'grid-template-columns:2fr 6fr 3fr;gap:18px;align-items:start;">'
+        f'{_kanban_sidebar_mock()}{_kanban_mock()}{_ai_pm_drawer_mock()}'
         f'</div></div>'
     )
 
