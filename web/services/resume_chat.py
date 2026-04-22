@@ -234,8 +234,32 @@ def _handle_full_rewrite(
             "error": None,
             "raw": "",
         }
-    except AIError as e:
-        return _err("整体重写失败", str(e))
+    except Exception as e:
+        try:
+            from .resume_validator import ValidationError
+        except Exception:
+            ValidationError = None  # type: ignore[assignment]
+
+        if ValidationError is not None and isinstance(e, ValidationError):
+            report = e.report
+            return {
+                "intent": "validation_draft",
+                "explanation": (
+                    f"AI 已返回草稿，但有 {len(report.hard_errors)} 条硬规则问题，"
+                    "未自动应用到简历。"
+                ),
+                "pending_patch": None,
+                "new_data": None,
+                "draft": e.draft,
+                "validation": report.as_dict(),
+                "advice_md": None,
+                "clarify_question": None,
+                "error": None,
+                "raw": e.raw or "",
+            }
+        if isinstance(e, AIError):
+            return _err("整体重写失败", str(e))
+        return _err("整体重写失败", f"{type(e).__name__}: {e}")
 
 
 def _handle_advice(

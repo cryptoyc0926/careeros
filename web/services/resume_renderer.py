@@ -144,7 +144,7 @@ def render_preview_png(
     pdf_bytes: bytes | None = None,
 ) -> tuple[bytes | None, str]:
     """
-    生成简历第一页 PNG 预览。三级降级：
+    生成当前定制简历第一页 PNG 预览。三级降级：
       1. PyMuPDF (fitz)  — 纯 Python wheel，无系统依赖，首选
       2. pdf2image      — 需要 poppler/pdftoppm，作为次选
       3. 失败            — 返回 (None, "iframe")，调用方自行展示 PDF iframe

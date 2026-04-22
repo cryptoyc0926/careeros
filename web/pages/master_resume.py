@@ -17,7 +17,8 @@ from pathlib import Path
 import streamlit as st
 
 from config import settings
-from components.ui import page_header, section_title, divider, alert_success, alert_danger
+from components.ui import page_header, section_title, divider, alert_success, alert_danger, alert_warning
+from services.action_status import format_action_status_caption, record_action_status
 
 DB_PATH = settings.db_full_path
 
@@ -111,6 +112,9 @@ def load_master() -> dict:
 
 
 def save_master(m: dict) -> None:
+    from services.resume_quality import sanitize_master
+
+    m = sanitize_master(m)
     # 先备份
     bak = Path(str(DB_PATH) + f".bak_before_master_save")
     try:
@@ -216,8 +220,6 @@ def text_to_bullets(text: str) -> list[str]:
 page_header(
     "主简历",
     subtitle="维护你的底稿，让每次定制都更轻松",
-    right_text="生成简历",
-    right_page="pages/resume_tailor.py",
 )
 
 # session state 初始化
@@ -230,14 +232,20 @@ top_col1, top_col2, top_col3, top_col4 = st.columns([1, 1, 1.2, 2.5])
 with top_col1:
     if st.button("重新加载", use_container_width=True):
         st.session_state.master_data = load_master()
+        record_action_status(st.session_state, "master_resume_save", "success", "已重新加载主简历")
         st.rerun()
 with top_col2:
     if st.button("保存全部", type="primary", use_container_width=True):
-        save_master(st.session_state.master_data)
-        clear_tailor_state_after_master_change()
-        st.session_state.master_data = load_master()
-        st.session_state["_just_saved"] = True
-        st.rerun()
+        try:
+            save_master(st.session_state.master_data)
+            clear_tailor_state_after_master_change()
+            st.session_state.master_data = load_master()
+            record_action_status(st.session_state, "master_resume_save", "success", "主简历已保存并刷新定制缓存")
+            st.session_state["_just_saved"] = True
+            st.rerun()
+        except Exception as e:
+            record_action_status(st.session_state, "master_resume_save", "error", f"保存失败：{e}")
+            alert_danger(f"保存失败：{e}")
 with top_col3:
     # 导出当前主简历为 JSON
     _export_payload = {
@@ -252,6 +260,8 @@ with top_col3:
         mime="application/json",
         use_container_width=True,
         help="把当前主简历导出为 JSON 文件，下次可在「系统设置 → 数据备份」里导入",
+        on_click=record_action_status,
+        args=(st.session_state, "master_resume_export", "success", "主简历 JSON 下载已触发"),
     )
 with top_col4:
     # 当前数据摘要
@@ -262,6 +272,10 @@ with top_col4:
     name = (m.get("basics") or {}).get("name", "") or "（未填）"
     summary = f"姓名：{name} · {n_proj} 项目 / {n_intern} 实习 / {n_skills} 技能 / {n_edu} 教育"
     st.caption(f"DB: `{Path(DB_PATH).name}` · record_id: {m.get('id') or '（新建）'} · {summary}")
+    for _status_key in ("master_resume_save", "master_resume_export"):
+        _caption = format_action_status_caption(st.session_state, _status_key)
+        if _caption:
+            st.caption(_caption)
 
 # 保存成功提示（在 rerun 后显示）
 if st.session_state.pop("_just_saved", False):
@@ -284,7 +298,7 @@ if st.session_state.get("uploaded_pdf_bytes"):
     with st.expander(f"📄 原简历 PDF 预览（{pdf_name} · {len(pdf_bytes):,} 字节）· 点击展开", expanded=False):
         st.markdown(
             f'<iframe src="data:application/pdf;base64,{_b64_data}" '
-            f'width="100%" height="600px" style="border:1px solid rgba(29,29,31,0.08);border-radius:14px"></iframe>',
+            f'width="100%" height="600px" style="border:1px solid rgba(11,18,32,0.08);border-radius:14px"></iframe>',
             unsafe_allow_html=True,
         )
         col_clear, _ = st.columns([1, 4])
@@ -363,7 +377,7 @@ with tab_profile:
 # ── 项目 / 实习 / 教育 通用编辑器 ───────────────────────────
 def render_exp_editor(key: str, items: list[dict], label: str):
     if not items:
-        items.append({"company": "", "role": "", "date": "", "bullets": []})
+        st.caption(f"暂无{label}。点击下方按钮新增。")
 
     for idx, it in enumerate(items):
         with st.expander(
@@ -473,59 +487,81 @@ with tab_upload:
         if text:
             alert_success(f"文本提取完成（{len(text):,} 字符）。系统会先自动规则解析并保存；也可以手动重跑或用 AI 覆盖。")
 
-            def _apply_parsed(parsed: dict, *, persist: bool = True) -> None:
-                st.session_state["master_data"] = {
-                    "id":          (st.session_state.get("master_data") or {}).get("id"),
-                    "basics":      parsed["basics"],
-                    "profile":     {"pool": [{"id": "default", "tags": [], "text": parsed.get("profile") or ""}], "default": "default"},
-                    "projects":    parsed.get("projects") or [],
-                    "internships": parsed.get("internships") or [],
-                    "skills":      parsed.get("skills") or [],
-                    "education":   parsed.get("education") or [],
-                }
+            def _apply_parsed(parsed: dict, *, persist: bool = True, explicit_overwrite: bool = False) -> bool:
+                from services.resume_master_import import build_master_from_parsed, should_persist_parsed_resume
+
+                existing_master = st.session_state.get("master_data") or load_master()
+                candidate = build_master_from_parsed(parsed, existing_master=existing_master)
+                decision = should_persist_parsed_resume(
+                    candidate,
+                    existing_master=existing_master,
+                    explicit_overwrite=explicit_overwrite,
+                )
+                st.session_state["_last_parsed_master_candidate"] = candidate
+                st.session_state["_last_parsed_master_decision"] = decision
+
+                if persist and not decision.persist:
+                    return False
+
+                st.session_state["master_data"] = candidate
                 clear_tailor_state_after_master_change()
                 if persist:
                     save_master(st.session_state["master_data"])
                     st.session_state["master_data"] = load_master()
+                return True
 
-            def _parse_summary(parsed: dict) -> tuple[str, bool]:
-                n_proj = len(parsed.get("projects", []))
-                n_intern = len(parsed.get("internships", []))
-                n_skills = len(parsed.get("skills", []))
-                n_edu = len(parsed.get("education", []))
-                name_ok = bool(parsed["basics"].get("name"))
-                low_quality = (not name_ok) or (n_proj + n_intern == 0) or (n_edu == 0)
+            def _parse_summary(master_data: dict) -> tuple[str, bool]:
+                from services.resume_quality import summarize_resume_quality
+
+                quality = summarize_resume_quality(master_data)
+                basics = master_data.get("basics") or {}
                 summary = (
-                    f"识别到 姓名「{parsed['basics'].get('name') or '未识别'}」· "
-                    f"{n_proj} 个项目 · {n_intern} 段经历 · {n_skills} 类技能 · {n_edu} 段教育"
+                    f"识别到 姓名「{basics.get('name') or '未识别'}」· "
+                    f"{quality.projects_count} 个项目 · {quality.internships_count} 段经历 · "
+                    f"{quality.skills_count} 类技能 · {quality.education_count} 段教育"
                 )
-                return summary, low_quality
+                return summary, quality.low_quality
 
             file_sig = hashlib.sha256(f"{f.name}:{f.size}:{text}".encode("utf-8")).hexdigest()
             if st.session_state.get("_resume_upload_auto_parse_sig") != file_sig:
                 try:
                     from services.resume_rule_parser import parse_resume_text as rule_parse
                     parsed = rule_parse(text)
-                    _apply_parsed(parsed)
-                    summary, low_quality = _parse_summary(parsed)
+                    persisted = _apply_parsed(parsed)
+                    candidate = st.session_state["_last_parsed_master_candidate"]
+                    summary, low_quality = _parse_summary(candidate)
                     st.session_state["_resume_upload_auto_parse_sig"] = file_sig
-                    st.session_state["_resume_upload_auto_parse_message"] = (summary, low_quality)
+                    st.session_state["_resume_upload_auto_parse_message"] = (summary, low_quality, persisted)
                     st.rerun()
                 except Exception as e:
                     alert_danger(f"自动规则解析失败：{type(e).__name__}: {e}")
 
             if st.session_state.get("_resume_upload_auto_parse_message"):
-                summary, low_quality = st.session_state["_resume_upload_auto_parse_message"]
-                if low_quality:
+                message = st.session_state["_resume_upload_auto_parse_message"]
+                if len(message) == 2:
+                    summary, low_quality = message
+                    persisted = not low_quality
+                else:
+                    summary, low_quality, persisted = message
+                if low_quality and not persisted:
                     alert_warning(
-                        f"自动规则解析识别率较低。{summary}。\n\n"
-                        f"建议使用「AI 智能解析并保存」覆盖。"
+                        f"自动规则解析识别率较低，未覆盖当前主简历。{summary}。\n\n"
+                        f"建议使用「AI 智能解析并保存」，或确认后手动覆盖。"
                     )
                 else:
                     alert_success(
                         f"自动规则解析完成并已写入数据库。{summary}。"
                         f"在线定制编辑会立即使用这份新主简历。"
                     )
+                candidate = st.session_state.get("_last_parsed_master_candidate")
+                if candidate and low_quality and not persisted:
+                    if st.button("仍然用这次规则解析结果覆盖", key="force_low_quality_parse_overwrite", use_container_width=True):
+                        st.session_state["master_data"] = candidate
+                        save_master(st.session_state["master_data"])
+                        clear_tailor_state_after_master_change()
+                        st.session_state["master_data"] = load_master()
+                        st.session_state["_resume_upload_auto_parse_message"] = None
+                        st.rerun()
 
             col_rule, col_ai = st.columns(2)
 
@@ -538,16 +574,17 @@ with tab_upload:
                         from services.resume_rule_parser import parse_resume_text as rule_parse
                         with st.spinner("规则解析中..."):
                             parsed = rule_parse(text)
-                        _apply_parsed(parsed)
+                        persisted = _apply_parsed(parsed)
 
                         # 规则解析质量自检
-                        summary, low_quality = _parse_summary(parsed)
+                        candidate = st.session_state.get("_last_parsed_master_candidate") or st.session_state.master_data
+                        summary, low_quality = _parse_summary(candidate)
 
-                        if low_quality:
+                        if low_quality and not persisted:
                             # 关键字段缺失 → 显著提示用户切到 AI 兜底
                             st.session_state["_rule_parse_low_quality"] = True
                             alert_warning(
-                                f"规则解析识别率较低。{summary}。\n\n"
+                                f"规则解析识别率较低，未覆盖当前主简历。{summary}。\n\n"
                                 f"**建议点右侧「AI 智能解析」用 Claude 兜底**"
                                 f"（规则解析对非标准格式简历覆盖有限）。"
                             )
@@ -571,14 +608,13 @@ with tab_upload:
                         from services.resume_parser import parse_resume_text as ai_parse
                         with st.spinner("AI 解析中（约 10-30 秒）..."):
                             parsed = ai_parse(text)
-                        _apply_parsed(parsed)
-                        alert_success(
-                            f"AI 解析完成并已写入数据库。识别到 "
-                            f"{len(parsed['projects'])} 个项目 · "
-                            f"{len(parsed['internships'])} 段实习 · "
-                            f"{len(parsed['skills'])} 类技能 · "
-                            f"{len(parsed['education'])} 段教育。"
-                        )
+                        persisted = _apply_parsed(parsed)
+                        candidate = st.session_state.get("_last_parsed_master_candidate") or st.session_state.master_data
+                        summary, low_quality = _parse_summary(candidate)
+                        if persisted:
+                            alert_success(f"AI 解析完成并已写入数据库。{summary}。")
+                        else:
+                            alert_warning(f"AI 解析结果质量仍然偏低，未覆盖当前主简历。{summary}。")
                         st.rerun()
                     except Exception as e:
                         alert_danger(f"AI 解析失败：{type(e).__name__}: {e}")

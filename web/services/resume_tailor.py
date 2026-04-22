@@ -159,7 +159,8 @@ def tailor_resume(master: dict, jd_text: str, jd_intent: dict | None = None) -> 
     from services.resume_validator import validate_tailored, ValidationError
     report = validate_tailored(flat_master, result, jd_intent)
     if not report.ok:
-        raise ValidationError(report)
+        draft = _merge_tailored(flat_master, result, jd_intent)
+        raise ValidationError(report, draft=draft, raw=result)
 
     # 合并回完整 data 结构（renderer 需要的扁平格式）
     merged = _merge_tailored(flat_master, result, jd_intent)

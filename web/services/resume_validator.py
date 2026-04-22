@@ -65,11 +65,42 @@ class ValidationReport:
 
 
 class ValidationError(Exception):
-    """硬规则校验失败。携带 ValidationReport 供上层渲染。"""
+    """硬规则校验失败。携带 ValidationReport 和可选草稿供上层渲染。"""
 
-    def __init__(self, report: ValidationReport):
+    def __init__(
+        self,
+        report: ValidationReport,
+        *,
+        draft: dict[str, Any] | None = None,
+        raw: dict[str, Any] | None = None,
+    ):
         self.report = report
+        self.draft = draft
+        self.raw = raw
         super().__init__(report.summary())
+
+
+def _issue_get(issue: ValidationIssue | dict[str, Any], key: str, default: str = "") -> str:
+    """兼容 ValidationIssue dataclass 和旧 dict 结构。"""
+    if isinstance(issue, dict):
+        value = issue.get(key, default)
+    else:
+        value = getattr(issue, key, default)
+    return "" if value is None else str(value)
+
+
+def format_validation_issue_markdown(issue: ValidationIssue | dict[str, Any]) -> str:
+    """把单条校验项渲染成 Markdown，供页面展示。"""
+    rule = _issue_get(issue, "rule", "?")
+    location = _issue_get(issue, "location", "?")
+    message = _issue_get(issue, "message", "")
+    expected = _issue_get(issue, "expected", "")
+    actual = _issue_get(issue, "actual", "")
+
+    rendered = f"- **[{rule}]** `{location}` — {message}"
+    if expected or actual:
+        rendered += f"\n\n  期望：`{expected}`\n\n  实际：`{actual}`"
+    return rendered
 
 
 # ── 工具 ────────────────────────────────────────────────
@@ -227,14 +258,14 @@ def validate_tailored(
                         actual=", ".join(sorted(t_tokens)),
                     ))
 
-                # rule 4b: 裸露数字（AI 输出里没加 <b> 的数字）→ 硬错
+                # rule 4b: 裸露数字（AI 输出里没加 <b> 的数字）→ 警告
                 naked = _find_naked_numbers(t_b)
                 if naked:
-                    report.hard_errors.append(ValidationIssue(
-                        severity="hard",
+                    report.warnings.append(ValidationIssue(
+                        severity="warn",
                         rule="number_not_bolded",
                         location=f"{section}[{i}].bullets[{bi}]",
-                        message=f"数字没加 <b> 标签：{', '.join(naked)}",
+                        message=f"数字未加 <b> 标签：{', '.join(naked)}",
                         expected="<b>xxx</b>",
                         actual=t_b[:80],
                     ))
