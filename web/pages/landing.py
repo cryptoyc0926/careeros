@@ -163,8 +163,9 @@ def _render_topbar() -> None:
     with c_menu:
         _h(
             f'<div style="display:flex;gap:32px;font-size:14px;color:{C_INK_SUB};padding:16px 0 16px 40px;">'
-            f'<a href="#feature-1" style="color:inherit;text-decoration:none;">产品功能</a>'
-            f'<a href="#feature-2" style="color:inherit;text-decoration:none;">使用指南</a>'
+            f'<a href="#feature-1" style="color:inherit;text-decoration:none;">产品功能 ▾</a>'
+            f'<a href="#feature-2" style="color:inherit;text-decoration:none;">使用场景</a>'
+            f'<a href="#feature-3" style="color:inherit;text-decoration:none;">定价</a>'
             f'<a href="#feature-3" style="color:inherit;text-decoration:none;">资源中心</a>'
             f'</div>'
         )
@@ -172,7 +173,7 @@ def _render_topbar() -> None:
         if st.button("登录", key="landing_nav_login", use_container_width=True):
             _enter_app()
     with c_cta:
-        if st.button("免费试用", key="landing_nav_cta", type="primary",
+        if st.button("免费体验", key="landing_nav_cta", type="primary",
                      use_container_width=True):
             _enter_app()
 
@@ -180,83 +181,193 @@ def _render_topbar() -> None:
 # =========================================================================
 # Section 1 — Hero
 # =========================================================================
-def _hero_check(text: str) -> str:
+def _hero_check(icon: str, title: str, desc: str) -> str:
     return (
-        f'<div style="display:flex;align-items:center;gap:10px;">'
-        f'<span style="display:inline-flex;width:22px;height:22px;border-radius:50%;'
-        f'background:{C_PRIMARY};color:#fff;align-items:center;justify-content:center;'
-        f'font-size:12px;font-weight:700;">✓</span>'
-        f'<span style="font-size:15px;color:{C_INK};">{_html.escape(text)}</span>'
+        f'<div style="display:flex;align-items:flex-start;gap:12px;'
+        f'border:1px solid {C_BORDER};border-radius:12px;padding:14px 16px;'
+        f'background:{C_BG};box-shadow:0 1px 2px rgba(11,18,32,.04);">'
+        f'<span style="display:inline-flex;width:28px;height:28px;border-radius:8px;'
+        f'background:{C_PRIMARY_SOFT};color:{C_PRIMARY};align-items:center;'
+        f'justify-content:center;font-size:15px;line-height:1;flex-shrink:0;">{_html.escape(icon)}</span>'
+        f'<span style="display:flex;flex-direction:column;gap:3px;">'
+        f'<span style="font-size:15px;color:{C_INK};font-weight:700;">{_html.escape(title)}</span>'
+        f'<span style="font-size:13px;color:{C_INK_SUB};line-height:1.45;">{_html.escape(desc)}</span>'
+        f'</span>'
         f'</div>'
     )
 
 
 def _hero_editor_mock() -> str:
-    toolbar_parts = [
-        f'<span style="padding:3px 10px;border:1px solid {C_BORDER};border-radius:6px;'
-        f'font-size:12px;color:{C_INK_SUB};background:#fff;">正文</span>'
+    action_btn = (
+        f'<span style="display:inline-flex;align-items:center;justify-content:center;'
+        f'padding:3px 8px;border:1px solid {C_BORDER};border-radius:7px;'
+        f'background:#fff;color:{C_INK_SUB};font-size:11px;font-weight:600;white-space:nowrap;">'
+    )
+
+    def inline_actions(primary: bool = False) -> str:
+        first = "AI 优化" if primary else "优化"
+        rewrite = f'{action_btn}重写</span>' if primary else ""
+        return (
+            f'<span style="display:inline-flex;align-items:center;gap:5px;margin-left:8px;">'
+            f'{action_btn}{first}</span>'
+            f'{rewrite}'
+            f'{action_btn}⋯</span>'
+            f'</span>'
+        )
+
+    def section_title(text: str) -> str:
+        return (
+            f'<div style="font-size:13px;font-weight:800;color:{C_INK};'
+            f'padding-top:10px;margin-top:10px;border-top:1px solid {C_BORDER};">{text}</div>'
+        )
+
+    def exp_row(company: str, role: str, date: str) -> str:
+        return (
+            f'<div style="display:grid;grid-template-columns:1.35fr 1fr auto;gap:8px;'
+            f'align-items:baseline;margin-top:8px;">'
+            f'<span style="font-weight:700;color:{C_INK};font-size:12.5px;">{company}</span>'
+            f'<span style="color:{C_INK_SUB};font-size:12px;">{role}</span>'
+            f'<span style="color:{C_INK_MUTE};font-size:11.5px;white-space:nowrap;">{date}</span>'
+            f'</div>'
+        )
+
+    def bullet(text: str, highlighted: bool = False) -> str:
+        style = (
+            f'background:{C_PRIMARY_SOFT};border-left:3px solid {C_PRIMARY};'
+            f'padding:6px 10px;border-radius:6px;margin:5px 0;'
+            if highlighted else 'margin:4px 0;'
+        )
+        return (
+            f'<div style="{style}color:{C_INK_SUB};font-size:11.5px;line-height:1.55;">'
+            f'· {_html.escape(text)}</div>'
+        )
+
+    def dots(active: int) -> str:
+        return ''.join(
+            f'<span style="width:6px;height:6px;border-radius:50%;'
+            f'background:{C_PRIMARY if i < active else C_BG_MUTED};display:inline-block;"></span>'
+            for i in range(5)
+        )
+
+    jd_rows = [
+        ("用户增长", 5),
+        ("内容运营", 5),
+        ("社群运营", 4),
+        ("X (Twitter)", 4),
+        ("Telegram", 5),
+        ("内容矩阵", 5),
+        ("数据分析", 3),
+        ("AI 工具", 5),
     ]
-    for t, w in [('B', 700), ('I', 400), ('U', 400), ('S', 400)]:
-        toolbar_parts.append(
-            f'<span style="display:inline-flex;width:26px;height:26px;border-radius:6px;'
-            f'align-items:center;justify-content:center;color:{C_INK_SUB};'
-            f'font-size:13px;font-weight:{w};">{t}</span>'
-        )
-    toolbar_parts.append(
-        f'<span style="width:1px;height:16px;background:{C_BORDER};margin:0 6px;"></span>'
+    jd_match = ''.join(
+        f'<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;'
+        f'font-size:11.5px;color:{C_INK_SUB};margin-top:7px;">'
+        f'<span>{_html.escape(label)}</span>'
+        f'<span style="display:inline-flex;gap:4px;align-items:center;">{dots(count)}</span>'
+        f'</div>'
+        for label, count in jd_rows
     )
-    for t in ['H1', 'H2', '≡']:
-        toolbar_parts.append(
-            f'<span style="display:inline-flex;width:26px;height:26px;border-radius:6px;'
-            f'align-items:center;justify-content:center;color:{C_INK_SUB};font-size:13px;">{t}</span>'
-        )
-    toolbar_parts.append(
-        f'<span style="margin-left:auto;padding:5px 12px;background:{C_PRIMARY};'
-        f'color:#fff;border-radius:8px;font-size:12px;font-weight:600;">AI 润色</span>'
-    )
+
     toolbar = (
-        '<div style="display:flex;align-items:center;gap:4px;'
-        f'padding:8px 12px;border-bottom:1px solid {C_BORDER};'
-        'background:#FBFBFC;border-radius:14px 14px 0 0;">'
-        + ''.join(toolbar_parts)
-        + '</div>'
+        f'<div style="display:flex;align-items:center;gap:5px;padding:8px 10px;'
+        f'border-bottom:1px solid {C_BORDER};background:#FBFBFC;border-radius:14px 14px 0 0;">'
+        f'{action_btn}正文</span>'
+        f'{action_btn}10.5 ▾</span>'
+        f'<span style="display:inline-flex;gap:2px;align-items:center;">'
+        f'<span style="font-size:12px;font-weight:800;color:{C_INK_SUB};padding:3px 5px;">B</span>'
+        f'<span style="font-size:12px;font-style:italic;color:{C_INK_SUB};padding:3px 5px;">I</span>'
+        f'<span style="font-size:12px;text-decoration:underline;color:{C_INK_SUB};padding:3px 5px;">U</span>'
+        f'</span>'
+        f'{action_btn}≡</span>'
+        f'{action_btn}↗</span>'
+        f'<span style="flex:1;"></span>'
+        f'{action_btn}保存</span>'
+        f'{action_btn}导出 ▾</span>'
+        f'</div>'
     )
-    body = (
-        '<div style="padding:28px 32px;font-size:13px;line-height:1.55;">'
-        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">'
-        '<div>'
-        f'<div style="font-size:22px;font-weight:700;color:{C_INK};">杨 超</div>'
-        f'<div style="color:{C_INK_MUTE};font-size:12px;margin-top:4px;">'
-        '186-6790-0468 · ikyhui918@gmail.com · 杭州'
-        '</div></div>'
-        f'<div style="width:52px;height:52px;border-radius:8px;background:{C_BG_MUTED};"></div>'
-        '</div>'
-        f'<div style="height:1px;background:{C_BORDER};margin:12px 0;"></div>'
-        f'<div style="font-weight:700;color:{C_INK};margin-bottom:6px;">个人简介</div>'
-        f'<div style="color:{C_INK_SUB};font-size:12.5px;margin-bottom:14px;">'
-        '产品运营方向，擅长基于 AI Trading 的数据分析与 Growth 增长策略。1 万粉 X 运营者，Telegram 1,300 人社群创始人。'
-        '</div>'
-        '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;">'
-        f'<div style="font-weight:700;color:{C_INK};">AI Trading 实习</div>'
-        f'<div style="font-size:12px;color:{C_INK_MUTE};">2024.06 — 至今</div>'
-        '</div>'
-        f'<ul style="margin:6px 0 12px 16px;padding:0;color:{C_INK_SUB};font-size:12.5px;">'
-        '<li>主导 BTC/ETH 半自动做市策略，月度胜率 62%</li>'
-        '<li>设计 AI 信号过滤器，将无效交易下降 48%</li>'
-        '</ul>'
-        '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;">'
-        f'<div style="font-weight:700;color:{C_INK};">CareerOS 作品集</div>'
-        f'<div style="font-size:12px;color:{C_INK_MUTE};">个人项目</div>'
-        '</div>'
-        f'<ul style="margin:6px 0 0 16px;padding:0;color:{C_INK_SUB};font-size:12.5px;">'
-        '<li>JD 扫描 → 简历定制 → ATS 评分 → Pipeline 追踪，全流程自建</li>'
-        '</ul>'
-        '</div>'
+
+    resume_panel = (
+        f'<div style="background:#fff;border:1px solid {C_BORDER};border-radius:14px;'
+        f'box-shadow:{S_LG};overflow:hidden;min-width:0;">'
+        f'{toolbar}'
+        f'<div style="padding:20px 22px;font-size:12px;line-height:1.55;">'
+        f'<div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:12px;">'
+        f'<div style="min-width:0;">'
+        f'<div style="font-size:22px;font-weight:800;color:{C_INK};letter-spacing:.16em;">杨　超</div>'
+        f'<div style="color:{C_INK_MUTE};font-size:11.5px;margin-top:4px;">'
+        f'186-8795-0926  |  bc1chao0926@gmail.com</div>'
+        f'<div style="color:{C_INK_SUB};font-size:11.5px;margin-top:5px;">'
+        f'求职意向：AI 增长运营  |  期望城市：杭州  |  到岗时间：下周到岗</div>'
+        f'</div>'
+        f'<div style="width:46px;height:46px;border-radius:50%;background:{C_PRIMARY};'
+        f'color:#fff;display:flex;align-items:center;justify-content:center;'
+        f'font-size:12px;font-weight:800;box-shadow:0 4px 12px rgba(59,91,254,.28);">YC</div>'
+        f'</div>'
+        f'{section_title("个人总结")}'
+        f'<div style="display:flex;align-items:flex-start;gap:8px;margin-top:7px;">'
+        f'<div style="color:{C_INK_SUB};font-size:11.5px;line-height:1.6;">'
+        f'统计科班出身，擅长把数据变成增长动作。曾从 0 搭建 AI Trading 社区，实现 9,000+ 粉丝与 1,300+ Telegram 订阅，完成 20+ 次商业合作；3 段运营实习覆盖增长、内容与数据分析。'
+        f'</div>{inline_actions(True)}</div>'
+        f'{section_title("项目经历")}'
+        f'{exp_row("AI Trading 社区搭建", "用户增长运营", "2024.03 - 至今")}'
+        f'{bullet("从 0 搭建 X 与 Telegram 内容矩阵，在零投放预算下增长至 9,000+ 粉丝与 1,300+ 订阅。")}'
+        f'{bullet("设计热点监测、信号筛选、结构化分析，分发输出流程，稳定支撑每日 15+ 条内容产出。")}'
+        f'{bullet("围绕用户关注点做内容测试与社群运营，沉淀可复用的 AI 内容生产 SOP。")}'
+        f'<div style="display:flex;justify-content:flex-end;">{inline_actions(False)}</div>'
+        f'{exp_row("CareerOS 求职系统", "产品与自动化实践", "2025.10 - 至今")}'
+        f'{bullet("搭建岗位池、JD 解析、简历定制，按面试准备工作流，覆盖求职全链路。")}'
+        f'{bullet("用 SQLite 管理岗位与投递数据，结合大模型完成 JD 匹配、简历改写与评估。")}'
+        f'<div style="display:flex;justify-content:flex-end;">{inline_actions(False)}</div>'
+        f'{section_title("实习经历")}'
+        f'{exp_row("Fancy Tech", "海外产品运营实习生", "2024.06 - 2024.09")}'
+        f'{bullet("负责 AI 内容生产与分发，搭建 TikTok + Instagram 内容矩阵，应用 AI 工具批量生成选题与文案，优化发布策略，带动账号粉丝增长 200+，单条爆款内容播放量提升 5 倍。", True)}'
+        f'{bullet("拆解 PhotoRoom、Pebblely 等竞品链路，提炼高转化场景并输出产品优化建议。")}'
+        f'{bullet("在 Reddit、TikTok 垂直社群做英文私信触达与内容冷启动，验证产品 PMF 假设。")}'
+        f'<div style="display:flex;justify-content:flex-end;">{inline_actions(False)}</div>'
+        f'{exp_row("杭银消费金融股份有限公司", "数据运营实习生", "2023.06 - 2023.10")}'
+        f'{bullet("参与用户分层、活动复盘与指标看板维护，支持运营策略迭代。")}'
+        f'{bullet("整理业务数据与活动结果，输出周报和专项分析材料。")}'
+        f'<div style="display:flex;justify-content:flex-end;">{inline_actions(False)}</div>'
+        f'</div></div>'
     )
+
+    jd_panel = (
+        f'<div style="background:#fff;border:1px solid {C_BORDER};border-radius:14px;'
+        f'box-shadow:{S_MD};padding:18px 18px;min-width:0;">'
+        f'<div style="display:flex;align-items:center;justify-content:space-between;'
+        f'font-size:14px;font-weight:800;color:{C_INK};margin-bottom:10px;">'
+        f'<span>目标 JD</span><span style="font-size:16px;">📋</span></div>'
+        f'<div style="height:1px;background:{C_BORDER};margin-bottom:14px;"></div>'
+        f'<div style="font-size:15px;font-weight:800;color:{C_INK};">用户增长运营</div>'
+        f'<div style="font-size:12px;color:{C_INK_MUTE};margin-top:4px;">X · AI 行业</div>'
+        f'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">'
+        f'<span style="display:inline-flex;align-items:center;padding:2px 9px;'
+        f'border:1px solid {C_BORDER};border-radius:999px;background:#fff;'
+        f'color:{C_INK_SUB};font-size:11px;font-weight:500;line-height:1.6;">杭州</span>'
+        f'<span style="display:inline-flex;align-items:center;padding:2px 9px;'
+        f'border:1px solid {C_BORDER};border-radius:999px;background:#fff;'
+        f'color:{C_INK_SUB};font-size:11px;font-weight:500;line-height:1.6;">1-3 年</span>'
+        f'<span style="display:inline-flex;align-items:center;padding:2px 9px;'
+        f'border:1px solid {C_BORDER};border-radius:999px;background:#fff;'
+        f'color:{C_INK_SUB};font-size:11px;font-weight:500;line-height:1.6;">本科</span>'
+        f'</div>'
+        f'<div style="font-size:13px;font-weight:800;color:{C_INK};margin-top:18px;">岗位要求</div>'
+        f'<div style="font-size:11.5px;color:{C_INK_SUB};line-height:1.65;margin-top:7px;">'
+        f'<div>• 负责社交平台（X / Telegram）用户增长</div>'
+        f'<div>• 搭建内容矩阵，制定内容策略并落地执行</div>'
+        f'<div>• 数据驱动，监测指标，优化增长策略</div>'
+        f'<div>• 熟悉 AI 工具，有内容自动化经验优先</div>'
+        f'</div>'
+        f'<div style="font-size:13px;font-weight:800;color:{C_INK};margin-top:18px;">关键词匹配</div>'
+        f'{jd_match}'
+        f'<div style="display:flex;justify-content:flex-end;margin-top:18px;">'
+        f'{action_btn}重新分析 JD</span>'
+        f'</div></div>'
+    )
+
     return (
-        f'<div style="background:#fff;border:1px solid {C_BORDER};'
-        f'border-radius:14px;box-shadow:{S_LG};overflow:hidden;">'
-        f'{toolbar}{body}</div>'
+        f'<div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;align-items:stretch;">'
+        f'{resume_panel}{jd_panel}</div>'
     )
 
 
@@ -270,18 +381,18 @@ def _section_hero() -> None:
         f'<div style="display:inline-flex;align-items:center;gap:6px;'
         f'background:{C_PRIMARY_SOFT};color:{C_PRIMARY_INK};'
         f'padding:5px 12px;border-radius:999px;'
-        f'font-size:12px;font-weight:600;margin-bottom:20px;">✨ 高效定制</div>'
+        f'font-size:12px;font-weight:600;margin-bottom:20px;">✦ 简历定制</div>'
         f'<h1 style="font-size:56px;font-weight:800;line-height:1.15;'
         f'color:{C_INK};letter-spacing:-0.02em;margin:0 0 20px 0;">'
-        f'像编辑文档一样<br/>定制简历</h1>'
+        f'像编辑文档一样<br/><span style="color:{C_PRIMARY};">定制简历</span></h1>'
         f'<p style="font-size:17px;color:{C_INK_SUB};line-height:1.6;'
         f'margin:0 0 28px 0;max-width:460px;">'
-        f'基于你的经历与目标 JD 智能匹配，像编辑 Word 一样调整每一段，'
-        f'让简历在 ATS 里更有竞争力。</p>'
+        f'基于目标岗位 JD，智能建议优化内容，让简历更贴合'
+        f'岗位要求，显著提升面试机会。</p>'
         f'<div style="display:flex;flex-direction:column;gap:12px;">'
-        f'{_hero_check("结构化抽取你的知识库内容")}'
-        f'{_hero_check("AI 智能匹配 JD 关键词")}'
-        f'{_hero_check("一键导出 PDF / Word 简历")}'
+        f'{_hero_check("📄", "所见即所得的在线编辑", "直接修改、增删、重写每一条经历与描述")}'
+        f'{_hero_check("⚡", "JD 驱动的智能优化建议", "对齐岗位关键词与能力要求，自动匹配度")}'
+        f'{_hero_check("🛡", "一键导出精美简历", "支持 PDF / Word 格式、排版精美、随时投递")}'
         f'</div></div>'
         f'<div>{_hero_editor_mock()}</div>'
         f'</div></div>'

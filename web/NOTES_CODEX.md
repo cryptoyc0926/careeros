@@ -45,3 +45,5 @@
 2026-04-22T12:42:50-0600 · codex · LEGACY-CLEANUP · DONE · 按用户最新口径删除投递追踪/面试准备/题库占位、旧 AI 生成按钮、旧 pipeline 服务和邮件配置入口
 2026-04-22T12:56:38-0600 · codex · RT-01-REV · DONE · toolbar 左两个控件改为固定 label popover，触发器显示「简历版本 ▾」/「导出 ▾」
 2026-04-22T13:05:38-0600 · codex · RT-01-REV2 · DONE · toolbar 外层/内层比例加宽，Playwright 量得版本 144px、导出 114px、高 24px
+2026-04-22T14:05:20-0600 · codex · L-1 · DONE · landing.py Hero/topbar 对齐 Image 2，nav/禁项/双面板/Fancy Tech 高亮 Playwright 验收通过
+2026-04-22T14:27:22-0600 · codex · L-1-REV · DONE · 修正 Hero mock 4 处 OCR 偏差：项目/实习按钮去「重写」、JD 改「岗位要求」、3 条 JD 文案替换、地点/经验/学历改独立 chip；py_compile + Chrome AX 验收通过
