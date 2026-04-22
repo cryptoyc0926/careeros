@@ -97,9 +97,9 @@ with t2:
     )
 with t3:
     task_action_card(
-        "检查跟进提醒",
-        "按渠道差异化节奏跟进，不错过任何一次回复窗口。",
-        "pages/followup.py",
+        "定制目标简历",
+        "选一个岗位，把主简历改成更贴近 JD 的版本。",
+        "pages/resume_tailor.py",
     )
 
 
@@ -137,9 +137,9 @@ with view_col:
 apple_section_heading("常用入口")
 
 cards = [
-    ("简历定制",     "选一个岗位，在线编辑生成量身定制的简历",      "pages/resume_tailor.py"),
-    ("进度追踪",     "看板视图，追踪每个岗位从投递到 Offer",        "pages/pipeline.py"),
-    ("面试准备",     "用 AI 模拟问答，也把公司情报准备好",          "pages/interview.py"),
+    ("添加岗位 JD",  "把目标岗位录入系统，后续定制和分析都从这里开始", "pages/jd_input.py"),
+    ("浏览 JD 库",   "集中查看已经保存的岗位描述和处理状态",          "pages/jd_browser.py"),
+    ("数据分析",     "查看岗位池、投递结果和优先级分布",              "pages/analytics.py"),
 ]
 
 row = st.columns(3, gap="medium")

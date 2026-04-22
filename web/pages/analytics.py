@@ -38,7 +38,7 @@ def render_bar_chart(df: pd.DataFrame, x_col: str, y_col: str, empty_text: str) 
             f'<div style="display:grid;grid-template-columns:72px 1fr 36px;'
             f'align-items:center;gap:10px;margin:9px 0;font-family:{FONT_SANS}">'
             f'<span style="font-size:12px;color:{TEXT_MUTED};white-space:nowrap">{label}</span>'
-            f'<span style="height:10px;background:rgba(0,113,227,0.10);border-radius:99px;overflow:hidden">'
+            f'<span style="height:10px;background:rgba(59,91,254,0.10);border-radius:99px;overflow:hidden">'
             f'<span style="display:block;width:{width}%;height:100%;background:{ACCENT_BLUE};border-radius:99px"></span>'
             f'</span>'
             f'<span style="font-size:12px;color:{TEXT_STRONG};text-align:right;font-variant-numeric:tabular-nums">{value_text}</span>'
@@ -95,7 +95,7 @@ with side_col:
 #   - P0/总数 低 → 岗位质量不够，需要优化搜索策略
 #   - 已投递/P0 低 → 行动力不足，今天就去投
 #   - 面试/已投递 低 → 简历需要优化
-#   - Offer/面试 低 → 面试准备不足
+#   - Offer/面试 低 → 跟进节奏不足
 
 apple_section_heading("求职转化漏斗", "每个阶段的转化率帮你定位瓶颈 — 哪个环节在拖后腿")
 
@@ -126,7 +126,7 @@ elif jp_p0 > 0 and jp_applied > 0 and jp_applied / jp_p0 < 0.3:
 elif jp_applied > 0 and jd_interview == 0:
     diagnostic_alert("info", f"已投递 {jp_applied} 个，还没有面试邀约 — 检查简历匹配度，或跟进 HR")
 elif jd_interview > 0 and jd_offer == 0:
-    diagnostic_alert("success", f"{jd_interview} 个面试进行中，做好面试准备")
+    diagnostic_alert("success", f"{jd_interview} 个面试进行中，保持跟进节奏")
 elif jd_offer > 0:
     diagnostic_alert("success", f"已拿到 {jd_offer} 个 Offer")
 

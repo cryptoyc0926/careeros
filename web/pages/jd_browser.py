@@ -16,7 +16,7 @@ col1, col2, col3, col4 = st.columns(4)
 STATUS_CN = {
     "全部": "全部",
     "bookmarked": "已收藏",
-    "resume_generated": "已生成简历",
+    "resume_generated": "已定制",
     "applied": "已投递",
     "follow_up": "跟进中",
     "interview": "面试中",
@@ -99,7 +99,7 @@ for row in rows:
 
     # 岗位
     with cols[0]:
-        st.markdown(f"**{row['title']}**  \n<span style='font-size:12px;color:#6e6e73'>{row['location'] or ''}</span>", unsafe_allow_html=True)
+        st.markdown(f"**{row['title']}**  \n<span style='font-size:12px;color:#6B7280'>{row['location'] or ''}</span>", unsafe_allow_html=True)
 
     # 公司
     with cols[1]:
@@ -131,7 +131,7 @@ for row in rows:
             channel = "手动添加"
 
         st.markdown(
-            f'<span style="color:#6e6e73;font-size:13px">{channel}</span>',
+            f'<span style="color:#6B7280;font-size:13px">{channel}</span>',
             unsafe_allow_html=True,
         )
 
@@ -217,7 +217,7 @@ for row in rows:
                 with st.expander("查看 JD 原文"):
                     st.text(d["raw_text"])
 
-                dc1, dc2, dc3 = st.columns(3)
+                dc1, dc3 = st.columns(2)
                 with dc1:
                     if not d.get("parsed_json"):
                         if st.button("AI 解析", key=f"parse_{row['id']}"):
@@ -238,10 +238,6 @@ for row in rows:
                                         st.rerun()
                                 except AIError as e:
                                     alert_danger(str(e))
-                with dc2:
-                    if st.button("生成简历", key=f"gen_{row['id']}"):
-                        st.session_state["target_jd_id"] = row["id"]
-                        st.switch_page("pages/resume_tailor.py")
                 with dc3:
                     if st.button("收起", key=f"close_{row['id']}"):
                         del st.session_state["detail_jd_id"]
