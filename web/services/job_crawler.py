@@ -52,6 +52,7 @@ class JobLead:
     priority: str = "P1"       # P0 / P1 / P2
     source: str = "WebSearch"  # WebSearch / LinkedIn / Moka / 飞书 / ...
     direction: str = ""        # 增长运营 / 产品运营 / 数据运营 / ...
+    link_type: str = ""        # "✅直达" / "🔶门户" / "📧邮件" / "❌失效"；空则入库时走默认
 
 
 @dataclass
@@ -197,6 +198,9 @@ def crawl_one(lead: JobLead, excluded: set[str] | None = None) -> dict:
     if scrape_err:
         notes += f" [scrape_failed: {scrape_err[:40]}]"
 
+    # 默认 link_type：有 URL 又是 ATS 直达源（lead 带 ✅直达）→ 保留；否则 🔶门户
+    lt = (lead.link_type or "").strip() or "🔶门户"
+
     try:
         jid = insert_job(
             company=lead.company,
@@ -208,6 +212,7 @@ def crawl_one(lead: JobLead, excluded: set[str] | None = None) -> dict:
             direction=lead.direction,
             source=lead.source,
             notes=notes,
+            link_type=lt,
         )
         return {
             "status": "inserted",

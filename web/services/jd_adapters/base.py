@@ -44,13 +44,33 @@ class Adapter:
 
 
 # ── HTTP helpers ────────────────────────────────────────
+# 国内域名：走直连不过 HTTPS_PROXY（本机代理对国内站 TLS 握手会被 reset）
+_CN_DOMAINS = (
+    ".cn", "ai-indeed.com", "liblib.art", "wujieai.com",
+    "nowcoder.com", "shixiseng.com", "yingjiesheng.com",
+    "liepin.com", "lagou.com", "51job.com",
+    "metaso.cn", "moonshot.cn", "minimaxi.com",
+    "stepfun.com", "deepseek.com", "kimi.com",
+    "baichuan-ai.com", "lingyiwanwu.com", "sensetime.com",
+    "zhipuai.cn", "bigmodel.cn", "infiniflow.org", "feishu.cn",
+)
+
+
+def _is_cn_domain(url: str) -> bool:
+    from urllib.parse import urlparse
+    host = urlparse(url).netloc.lower()
+    if not host:
+        return False
+    return any(host == d.lstrip(".") or host.endswith(d) for d in _CN_DOMAINS)
+
+
 def http_get(
     url: str,
     *,
     timeout: int = 15,
     headers: dict[str, str] | None = None,
 ) -> str:
-    """用 requests 做 GET。requests 自动处理 gzip/SSL/重定向，比 urllib 兼容中国站点。"""
+    """用 requests 做 GET。国内域名自动绕 HTTPS_PROXY。"""
     req_headers = {
         "User-Agent": UA,
         "Accept": "text/html,application/xhtml+xml,application/json,*/*",
@@ -59,15 +79,21 @@ def http_get(
     if headers:
         req_headers.update(headers)
 
+    # 国内站：显式 proxies=None 覆盖 session.trust_env
+    is_cn = _is_cn_domain(url)
+    session = requests.Session()
+    session.trust_env = not is_cn
+    proxies = {"http": None, "https": None} if is_cn else None
+
     try:
-        resp = requests.get(
+        resp = session.get(
             url,
             headers=req_headers,
             timeout=timeout,
             allow_redirects=True,
+            proxies=proxies,
         )
         resp.raise_for_status()
-        # requests 自动解 gzip，encoding 推断有时错，强制按 apparent_encoding 解
         if resp.encoding and resp.encoding.lower() == "iso-8859-1":
             resp.encoding = resp.apparent_encoding or "utf-8"
         return resp.text
