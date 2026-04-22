@@ -1,5 +1,6 @@
 # Codex 改动日志
 
+> 红线：任何 `st.markdown` 都禁止用裸 `<div class="xxx">` 开/闭 tag 跨越多个 Streamlit 调用；必须用 `st.container()` + CSS 选择器锚定。违反会被 Streamlit 自动闭合导致空壳。
 > 格式：`日期 | 类型(fix/refactor/test/audit) | 文件 | 一句话描述`
 > Codex 每次改完代码追加一行。Claude 启动时扫最近 10 行。
 
@@ -37,3 +38,10 @@
 2026-04-21 13:28 Codex · resume_tailor 视觉修正：说明区移到画布下方，A4 内容压紧，画布内编辑按钮强制白底浅交互
 2026-04-21 14:31 Codex · resume_tailor 紧凑修正：页头改薄、隐藏空 style/marker 间距、基本信息编辑移出画布、bullet 结构操作可用且错误全宽显示
 2026-04-21 15:02 Codex · resume_tailor P0 返工：A4 改用真实 Streamlit container 锚定，移除空 div 画布壳，bullet 仅保留上移/下移/删除，section 增加 AI 重写入口
+2026-04-22T12:14:02-0600 · codex · LEGACY-01 · DONE · 删除 7 个旧页面文件，run_e2e_test 改为当前产品面 smoke，legacy route test 3 项通过
+2026-04-22T12:16:24-0600 · codex · NAV-01 · DONE · app.py 侧栏改为 13 项 Image 1 结构，新增 7 个 new UI 占位页，py_compile/smoke 通过
+2026-04-22T12:18:28-0600 · codex · RT-01/RT-02 · DONE · Resume Tailor 大 title bar 与假 icon 列已删除，右对齐 toolbar + 3 列编译通过
+2026-04-22T12:19:46-0600 · codex · RT-03/RT-04 · DONE · ATS 评分改为 Image 1 水平条；resume_tailor 无可视演示标识，demo fallback 逻辑保留
+2026-04-22T12:42:50-0600 · codex · LEGACY-CLEANUP · DONE · 按用户最新口径删除投递追踪/面试准备/题库占位、旧 AI 生成按钮、旧 pipeline 服务和邮件配置入口
+2026-04-22T12:56:38-0600 · codex · RT-01-REV · DONE · toolbar 左两个控件改为固定 label popover，触发器显示「简历版本 ▾」/「导出 ▾」
+2026-04-22T13:05:38-0600 · codex · RT-01-REV2 · DONE · toolbar 外层/内层比例加宽，Playwright 量得版本 144px、导出 114px、高 24px
