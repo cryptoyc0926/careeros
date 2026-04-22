@@ -1,0 +1,616 @@
+"""CareerOS 对外官网 Landing —— 1:1 还原 new UI 5 张图。
+
+结构：
+  顶部 nav
+  ├ Section Hero    「像编辑文档一样 定制简历」
+  ├ Section AI Chat 「和 AI 边聊边改简历」
+  ├ Section Kanban  「从岗位到投递，全流程追踪」
+  ├ Section BYO-Key 「你的 Key，你的数据，你掌控」
+  └ Footer CTA
+
+注意：本页面 **色系独立于主仓库 Apple 工作台**（marketing vs product）。
+  - Landing：纯白 + 靛蓝 #3B5BFE（1:1 还原 5 张参考图）
+  - 主应用：Apple 暖灰 #f5f5f7 + Apple Blue #0071e3（由 app.py 全局 CSS 控制）
+
+关键红线：
+  - 所有 CSS/HTML 注入必须用 st.html（不是 st.markdown，避免 Markdown 缩进坑）
+  - 字体栈必须双引号
+  - 不写 HTML 注释（会被 Markdown parser 截断）
+"""
+
+from __future__ import annotations
+
+import html as _html
+
+import streamlit as st
+
+
+# =========================================================================
+# 局部设计 Token（Landing 独享，不污染主仓库 Apple tokens）
+# =========================================================================
+C_BG = "#FFFFFF"
+C_BG_SOFT = "#F7F8FA"
+C_BG_MUTED = "#EEF1F5"
+C_BORDER = "#E5E7EB"
+
+C_INK = "#0B1220"
+C_INK_SUB = "#4B5563"
+C_INK_MUTE = "#9CA3AF"
+
+C_PRIMARY = "#3B5BFE"
+C_PRIMARY_SOFT = "#EEF1FF"
+C_PRIMARY_INK = "#1E3AE8"
+
+C_SUCCESS = "#10B981"
+C_SUCCESS_SOFT = "#ECFDF5"
+C_WARN = "#F59E0B"
+C_DANGER = "#EF4444"
+
+R_MD = 10
+R_LG = 14
+R_PILL = 999
+
+S_MD = "0 4px 16px rgba(11,18,32,.08)"
+S_LG = "0 12px 32px rgba(11,18,32,.10)"
+
+FONT = ('"Inter","PingFang SC","Hiragino Sans GB",'
+        '"HarmonyOS Sans SC","Microsoft YaHei",sans-serif')
+
+
+def _h(s: str) -> None:
+    """稳妥注入 HTML：优先 st.html，fallback st.markdown。"""
+    try:
+        st.html(s)  # type: ignore[attr-defined]
+    except Exception:
+        st.markdown(s, unsafe_allow_html=True)
+
+
+def _chip(text: str, tone: str = "neutral", icon: str | None = None) -> str:
+    """胶囊标签。tone: neutral / primary / success / warn / danger"""
+    palette = {
+        "neutral": (C_BG_MUTED, C_INK_SUB),
+        "primary": (C_PRIMARY_SOFT, C_PRIMARY_INK),
+        "success": (C_SUCCESS_SOFT, C_SUCCESS),
+        "warn":    ("#FFFBEB", C_WARN),
+        "danger":  ("#FEF2F2", C_DANGER),
+    }
+    bg, fg = palette.get(tone, palette["neutral"])
+    icon_html = f'<span style="margin-right:4px;">{_html.escape(icon)}</span>' if icon else ""
+    return (
+        f'<span style="display:inline-flex;align-items:center;'
+        f'padding:2px 10px;background:{bg};color:{fg};'
+        f'border-radius:{R_PILL}px;font-size:12px;font-weight:500;'
+        f'line-height:1.6;white-space:nowrap;'
+        f'font-family:{FONT};">{icon_html}{_html.escape(text)}</span>'
+    )
+
+
+# =========================================================================
+# 页面配置 & 全局 Landing CSS（override 主仓库 Apple tokens）
+# =========================================================================
+try:
+    st.set_page_config(
+        page_title="CareerOS — 你的 AI 求职副驾",
+        page_icon=None,
+        layout="wide",
+        initial_sidebar_state="collapsed",
+    )
+except Exception:
+    pass
+
+
+# ⚠️ 这段 CSS 只在 Landing 生效（其他页面不 import 这个文件，不会受影响）
+# 因为 Streamlit 的 st.html 注入的 CSS 全局生效，我们通过「在 Landing 显示时压制 Apple 灰底」
+# + 「退出 Landing 后 app.py 的全局 CSS 会重新 rerun 覆盖回去」实现视觉隔离
+_LANDING_CSS = (
+    "<style>"
+    # 1) Reset Apple 灰底，Landing 全白
+    "html,body,.stApp{background:#FFFFFF!important;}"
+    f"html,body,[class*='css'],.stApp{{font-family:{FONT}!important;}}"
+    # 2) 隐藏 Streamlit 默认 toolbar / header / sidebar（Landing 全通栏）
+    "section[data-testid='stSidebar']{display:none!important;}"
+    "[data-testid='collapsedControl']{display:none!important;}"
+    "header[data-testid='stHeader']{display:none!important;}"
+    # 3) 主容器通栏 + 无 padding
+    ".main .block-container{max-width:100%!important;padding:0!important;}"
+    # 4) 按钮统一：primary 靛蓝、radius 10、无 box-shadow 外框
+    ".stButton>button{"
+    f"border-radius:{R_MD}px!important;font-weight:500!important;"
+    f"font-size:14px!important;padding:8px 16px!important;"
+    f"border:1px solid {C_BORDER}!important;"
+    f"background:{C_BG}!important;color:{C_INK}!important;"
+    "transition:all .15s cubic-bezier(.2,.7,.3,1)!important;"
+    "box-shadow:none!important;}"
+    ".stButton>button:hover{"
+    f"background:{C_BG_MUTED}!important;transform:translateY(-1px);}}"
+    ".stButton>button:active{transform:scale(.98);}"
+    '.stButton>button[kind="primary"]{'
+    f"background:{C_PRIMARY}!important;color:#fff!important;"
+    f"border-color:{C_PRIMARY}!important;"
+    "box-shadow:0 4px 12px rgba(59,91,254,.35)!important;}"
+    '.stButton>button[kind="primary"]:hover{'
+    f"background:{C_PRIMARY_INK}!important;}}"
+    "</style>"
+)
+_h(_LANDING_CSS)
+
+
+# =========================================================================
+# 入 app 路由 helper
+# =========================================================================
+def _enter_app() -> None:
+    """点 CTA 后进入工作台 —— 置 entered_app=True，app.py 读到后自动 rerun 走 navigation。"""
+    st.session_state["entered_app"] = True
+    st.rerun()
+
+
+# =========================================================================
+# 顶部 Nav
+# =========================================================================
+def _render_topbar() -> None:
+    c_logo, c_menu, c_login, c_cta = st.columns(
+        [3, 5, 1.2, 1.6], vertical_alignment="center"
+    )
+    with c_logo:
+        _h(
+            f'<div style="display:flex;align-items:center;gap:10px;'
+            f'font-weight:800;font-size:19px;color:{C_INK};padding:12px 0 12px 48px;">'
+            f'<span style="display:inline-flex;width:30px;height:30px;border-radius:9px;'
+            f'background:{C_PRIMARY};color:#fff;'
+            f'align-items:center;justify-content:center;font-size:16px;'
+            f'box-shadow:0 2px 8px rgba(59,91,254,.35);">C</span>CareerOS</div>'
+        )
+    with c_menu:
+        _h(
+            f'<div style="display:flex;gap:32px;font-size:14px;color:{C_INK_SUB};padding:16px 0 16px 40px;">'
+            f'<a href="#feature-1" style="color:inherit;text-decoration:none;">产品功能</a>'
+            f'<a href="#feature-2" style="color:inherit;text-decoration:none;">使用指南</a>'
+            f'<a href="#feature-3" style="color:inherit;text-decoration:none;">资源中心</a>'
+            f'</div>'
+        )
+    with c_login:
+        if st.button("登录", key="landing_nav_login", use_container_width=True):
+            _enter_app()
+    with c_cta:
+        if st.button("免费试用", key="landing_nav_cta", type="primary",
+                     use_container_width=True):
+            _enter_app()
+
+
+# =========================================================================
+# Section 1 — Hero
+# =========================================================================
+def _hero_check(text: str) -> str:
+    return (
+        f'<div style="display:flex;align-items:center;gap:10px;">'
+        f'<span style="display:inline-flex;width:22px;height:22px;border-radius:50%;'
+        f'background:{C_PRIMARY};color:#fff;align-items:center;justify-content:center;'
+        f'font-size:12px;font-weight:700;">✓</span>'
+        f'<span style="font-size:15px;color:{C_INK};">{_html.escape(text)}</span>'
+        f'</div>'
+    )
+
+
+def _hero_editor_mock() -> str:
+    toolbar_parts = [
+        f'<span style="padding:3px 10px;border:1px solid {C_BORDER};border-radius:6px;'
+        f'font-size:12px;color:{C_INK_SUB};background:#fff;">正文</span>'
+    ]
+    for t, w in [('B', 700), ('I', 400), ('U', 400), ('S', 400)]:
+        toolbar_parts.append(
+            f'<span style="display:inline-flex;width:26px;height:26px;border-radius:6px;'
+            f'align-items:center;justify-content:center;color:{C_INK_SUB};'
+            f'font-size:13px;font-weight:{w};">{t}</span>'
+        )
+    toolbar_parts.append(
+        f'<span style="width:1px;height:16px;background:{C_BORDER};margin:0 6px;"></span>'
+    )
+    for t in ['H1', 'H2', '≡']:
+        toolbar_parts.append(
+            f'<span style="display:inline-flex;width:26px;height:26px;border-radius:6px;'
+            f'align-items:center;justify-content:center;color:{C_INK_SUB};font-size:13px;">{t}</span>'
+        )
+    toolbar_parts.append(
+        f'<span style="margin-left:auto;padding:5px 12px;background:{C_PRIMARY};'
+        f'color:#fff;border-radius:8px;font-size:12px;font-weight:600;">AI 润色</span>'
+    )
+    toolbar = (
+        '<div style="display:flex;align-items:center;gap:4px;'
+        f'padding:8px 12px;border-bottom:1px solid {C_BORDER};'
+        'background:#FBFBFC;border-radius:14px 14px 0 0;">'
+        + ''.join(toolbar_parts)
+        + '</div>'
+    )
+    body = (
+        '<div style="padding:28px 32px;font-size:13px;line-height:1.55;">'
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">'
+        '<div>'
+        f'<div style="font-size:22px;font-weight:700;color:{C_INK};">杨 超</div>'
+        f'<div style="color:{C_INK_MUTE};font-size:12px;margin-top:4px;">'
+        '186-6790-0468 · ikyhui918@gmail.com · 杭州'
+        '</div></div>'
+        f'<div style="width:52px;height:52px;border-radius:8px;background:{C_BG_MUTED};"></div>'
+        '</div>'
+        f'<div style="height:1px;background:{C_BORDER};margin:12px 0;"></div>'
+        f'<div style="font-weight:700;color:{C_INK};margin-bottom:6px;">个人简介</div>'
+        f'<div style="color:{C_INK_SUB};font-size:12.5px;margin-bottom:14px;">'
+        '产品运营方向，擅长基于 AI Trading 的数据分析与 Growth 增长策略。1 万粉 X 运营者，Telegram 1,300 人社群创始人。'
+        '</div>'
+        '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;">'
+        f'<div style="font-weight:700;color:{C_INK};">AI Trading 实习</div>'
+        f'<div style="font-size:12px;color:{C_INK_MUTE};">2024.06 — 至今</div>'
+        '</div>'
+        f'<ul style="margin:6px 0 12px 16px;padding:0;color:{C_INK_SUB};font-size:12.5px;">'
+        '<li>主导 BTC/ETH 半自动做市策略，月度胜率 62%</li>'
+        '<li>设计 AI 信号过滤器，将无效交易下降 48%</li>'
+        '</ul>'
+        '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;">'
+        f'<div style="font-weight:700;color:{C_INK};">CareerOS 作品集</div>'
+        f'<div style="font-size:12px;color:{C_INK_MUTE};">个人项目</div>'
+        '</div>'
+        f'<ul style="margin:6px 0 0 16px;padding:0;color:{C_INK_SUB};font-size:12.5px;">'
+        '<li>JD 扫描 → 简历定制 → ATS 评分 → Pipeline 追踪，全流程自建</li>'
+        '</ul>'
+        '</div>'
+    )
+    return (
+        f'<div style="background:#fff;border:1px solid {C_BORDER};'
+        f'border-radius:14px;box-shadow:{S_LG};overflow:hidden;">'
+        f'{toolbar}{body}</div>'
+    )
+
+
+def _section_hero() -> None:
+    _h(
+        f'<div id="hero" style="padding:56px 56px 40px 56px;'
+        f'background:linear-gradient(180deg,#FFFFFF 0%, {C_BG_SOFT} 100%);">'
+        f'<div style="max-width:1280px;margin:0 auto;display:grid;'
+        f'grid-template-columns:5fr 6fr;gap:56px;align-items:center;">'
+        f'<div>'
+        f'<div style="display:inline-flex;align-items:center;gap:6px;'
+        f'background:{C_PRIMARY_SOFT};color:{C_PRIMARY_INK};'
+        f'padding:5px 12px;border-radius:999px;'
+        f'font-size:12px;font-weight:600;margin-bottom:20px;">✨ 高效定制</div>'
+        f'<h1 style="font-size:56px;font-weight:800;line-height:1.15;'
+        f'color:{C_INK};letter-spacing:-0.02em;margin:0 0 20px 0;">'
+        f'像编辑文档一样<br/>定制简历</h1>'
+        f'<p style="font-size:17px;color:{C_INK_SUB};line-height:1.6;'
+        f'margin:0 0 28px 0;max-width:460px;">'
+        f'基于你的经历与目标 JD 智能匹配，像编辑 Word 一样调整每一段，'
+        f'让简历在 ATS 里更有竞争力。</p>'
+        f'<div style="display:flex;flex-direction:column;gap:12px;">'
+        f'{_hero_check("结构化抽取你的知识库内容")}'
+        f'{_hero_check("AI 智能匹配 JD 关键词")}'
+        f'{_hero_check("一键导出 PDF / Word 简历")}'
+        f'</div></div>'
+        f'<div>{_hero_editor_mock()}</div>'
+        f'</div></div>'
+    )
+
+
+# =========================================================================
+# Section 2 — AI Chat
+# =========================================================================
+def _chat_card_mock() -> str:
+    return (
+        f'<div style="background:#fff;border:1px solid {C_BORDER};border-radius:14px;'
+        f'box-shadow:{S_MD};padding:20px 22px;margin-bottom:16px;max-width:540px;">'
+        f'<div style="display:flex;gap:10px;margin-bottom:12px;">'
+        f'<div style="width:28px;height:28px;border-radius:50%;background:{C_BG_MUTED};flex-shrink:0;"></div>'
+        f'<div style="background:{C_BG_SOFT};border-radius:10px 10px 10px 2px;'
+        f'padding:10px 14px;font-size:13.5px;color:{C_INK};">'
+        f'帮我把 AI Trading 实习那段改得更偏数据驱动，突出我做的信号过滤器和风控。</div></div>'
+        f'<div style="display:flex;gap:10px;flex-direction:row-reverse;">'
+        f'<div style="width:28px;height:28px;border-radius:50%;background:{C_PRIMARY};'
+        f'color:#fff;display:flex;align-items:center;justify-content:center;'
+        f'font-size:12px;font-weight:700;flex-shrink:0;">AI</div>'
+        f'<div style="background:{C_PRIMARY_SOFT};color:{C_PRIMARY_INK};'
+        f'border-radius:10px 10px 2px 10px;padding:10px 14px;font-size:13.5px;line-height:1.55;">'
+        f'好的，我把它调成数据+动作句式：<br/>'
+        f'<span style="color:{C_INK};font-weight:500;">'
+        f'· 主导 BTC/ETH 半自动做市策略，月度胜率 62%，累计回撤 &lt; 8%<br/>'
+        f'· 设计 AI 信号过滤器，无效交易下降 <b>48%</b>，单均滑点 -0.12%'
+        f'</span></div></div></div>'
+    )
+
+
+def _resume_snippet_mock() -> str:
+    return (
+        f'<div style="background:#fff;border:1px solid {C_BORDER};border-radius:14px;'
+        f'box-shadow:{S_MD};padding:18px 22px;max-width:540px;margin-left:40px;">'
+        f'<div style="font-weight:700;color:{C_INK};font-size:14px;margin-bottom:6px;">AI Trading 实习</div>'
+        f'<ul style="margin:0 0 0 18px;padding:0;color:{C_INK_SUB};font-size:13px;line-height:1.7;">'
+        f'<li>主导 BTC/ETH 半自动做市策略，月度胜率 '
+        f'<b style="color:{C_PRIMARY_INK};background:{C_PRIMARY_SOFT};padding:1px 6px;border-radius:4px;">62%</b></li>'
+        f'<li>设计 AI 信号过滤器，无效交易下降 '
+        f'<b style="color:{C_PRIMARY_INK};background:{C_PRIMARY_SOFT};padding:1px 6px;border-radius:4px;">48%</b></li>'
+        f'</ul></div>'
+    )
+
+
+def _section_ai_chat() -> None:
+    _h(
+        f'<div id="feature-1" style="padding:96px 56px;background:#fff;">'
+        f'<div style="max-width:1280px;margin:0 auto;display:grid;'
+        f'grid-template-columns:5fr 6fr;gap:64px;align-items:center;">'
+        f'<div>'
+        f'<h2 style="font-size:44px;font-weight:800;color:{C_INK};line-height:1.2;'
+        f'margin:0 0 18px 0;letter-spacing:-0.02em;">'
+        f'和 <span style="color:{C_PRIMARY};">AI</span> 边聊边改简历</h2>'
+        f'<p style="font-size:16px;color:{C_INK_SUB};line-height:1.65;max-width:440px;margin:0;">'
+        f'自然对话，精准优化。给它 JD 关键词，它帮你改写 bullet、压缩字数、换更有冲击力的表达。</p>'
+        f'</div>'
+        f'<div style="position:relative;">'
+        f'{_chat_card_mock()}'
+        f'{_resume_snippet_mock()}'
+        f'</div></div></div>'
+    )
+
+
+# =========================================================================
+# Section 3 — Kanban
+# =========================================================================
+def _kanban_mock() -> str:
+    cols_data = [
+        ("意向", 4, C_INK_MUTE,
+         [("MiniMax", "增长运营", "杭州"),
+          ("Kimi", "KOL 运营", "北京"),
+          ("智谱 AI", "产品运营", "北京"),
+          ("LiblibAI", "AI 运营", "杭州")]),
+        ("联系", 3, C_WARN,
+         [("DeepSeek", "AI PM", "杭州"),
+          ("昆仑万维", "产品增长", "北京"),
+          ("Talkie", "海外运营", "远程")]),
+        ("已面试", 2, C_PRIMARY,
+         [("MiniMax 星野", "增长运营", "92 分"),
+          ("Fancy Tech", "海外运营", "88 分")]),
+        ("面试中", 2, C_PRIMARY_INK,
+         [("同花顺 iFind", "需求分析师", "2 轮"),
+          ("杭银消金", "产品运营", "3 轮")]),
+        ("Offer", 1, C_SUCCESS,
+         [("某 AI 创业", "增长运营", "Offer ✓")]),
+    ]
+    col_blocks = []
+    for title, count, color, cards in cols_data:
+        cards_html = ""
+        for name, role, tag in cards:
+            cards_html += (
+                f'<div style="background:#fff;border:1px solid {C_BORDER};border-radius:10px;'
+                f'padding:10px 12px;margin-bottom:8px;box-shadow:0 1px 2px rgba(11,18,32,.06);">'
+                f'<div style="font-weight:600;font-size:13px;color:{C_INK};margin-bottom:2px;">{_html.escape(name)}</div>'
+                f'<div style="font-size:11.5px;color:{C_INK_SUB};margin-bottom:6px;">{_html.escape(role)}</div>'
+                f'<span style="display:inline-block;background:{C_BG_MUTED};color:{C_INK_SUB};'
+                f'padding:1px 8px;border-radius:999px;font-size:10.5px;">{_html.escape(tag)}</span>'
+                f'</div>'
+            )
+        col_blocks.append(
+            f'<div style="min-width:0;">'
+            f'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
+            f'<div style="display:flex;align-items:center;gap:6px;">'
+            f'<span style="width:8px;height:8px;border-radius:50%;background:{color};"></span>'
+            f'<span style="font-size:12.5px;font-weight:600;color:{C_INK};">{title}</span>'
+            f'</div>'
+            f'<span style="font-size:11px;color:{C_INK_MUTE};background:{C_BG_MUTED};'
+            f'padding:1px 7px;border-radius:999px;">{count}</span>'
+            f'</div>'
+            f'{cards_html}'
+            f'</div>'
+        )
+    return (
+        f'<div style="background:#fff;border:1px solid {C_BORDER};border-radius:14px;'
+        f'box-shadow:{S_MD};padding:20px;">'
+        f'<div style="display:flex;align-items:center;justify-content:space-between;'
+        f'margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid {C_BORDER};">'
+        f'<div style="display:flex;align-items:center;gap:10px;">'
+        f'<span style="display:inline-flex;width:26px;height:26px;border-radius:7px;'
+        f'background:{C_PRIMARY};color:#fff;align-items:center;justify-content:center;'
+        f'font-size:13px;font-weight:800;">C</span>'
+        f'<span style="font-weight:700;color:{C_INK};">我的投递</span>'
+        f'</div>'
+        f'<span style="background:{C_PRIMARY};color:#fff;padding:5px 12px;'
+        f'border-radius:8px;font-size:12px;font-weight:600;">+ 添加职位</span>'
+        f'</div>'
+        f'<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;">'
+        f'{"".join(col_blocks)}'
+        f'</div></div>'
+    )
+
+
+def _ai_pm_todo(text: str) -> str:
+    return (
+        f'<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px;'
+        f'font-size:12.5px;color:{C_INK_SUB};line-height:1.55;">'
+        f'<span style="display:inline-flex;flex-shrink:0;width:14px;height:14px;margin-top:2px;'
+        f'border:1.5px solid {C_BORDER};border-radius:3px;"></span>'
+        f'<span>{_html.escape(text)}</span></div>'
+    )
+
+
+def _ai_pm_drawer_mock() -> str:
+    return (
+        f'<div style="background:#fff;border:1px solid {C_BORDER};border-radius:14px;'
+        f'box-shadow:{S_MD};padding:18px 20px;">'
+        f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">'
+        f'<span style="display:inline-flex;width:28px;height:28px;border-radius:8px;'
+        f'background:{C_PRIMARY_SOFT};color:{C_PRIMARY_INK};'
+        f'align-items:center;justify-content:center;font-size:14px;">🧭</span>'
+        f'<span style="font-weight:700;color:{C_INK};font-size:14px;">AI 产品经理</span>'
+        f'</div>'
+        f'<div style="font-size:12.5px;color:{C_INK_SUB};'
+        f'background:{C_BG_SOFT};border-radius:10px;padding:12px 14px;line-height:1.6;margin-bottom:12px;">'
+        f'当前追踪 <b style="color:{C_INK};">MiniMax 星野 · 增长运营</b><br/>'
+        f'匹配度 <b style="color:{C_PRIMARY_INK};">92</b>，建议 2 天内跟进一轮面试反馈。'
+        f'</div>'
+        f'<div style="font-size:12px;color:{C_INK_MUTE};margin-bottom:8px;">建议动作</div>'
+        f'{_ai_pm_todo("补一版星野专属简历（重点：Telegram 社群 1300 人）")}'
+        f'{_ai_pm_todo("联系 HR Amanda 确认 HM 面试时间")}'
+        f'{_ai_pm_todo("准备 30min 作品集 demo（BTC 做市策略）")}'
+        f'</div>'
+    )
+
+
+def _section_kanban() -> None:
+    _h(
+        f'<div id="feature-2" style="padding:96px 56px;background:{C_BG_SOFT};">'
+        f'<div style="max-width:1280px;margin:0 auto;text-align:center;">'
+        f'<h2 style="font-size:44px;font-weight:800;color:{C_INK};line-height:1.2;'
+        f'margin:0 0 14px 0;letter-spacing:-0.02em;">'
+        f'从岗位到投递，<span style="color:{C_PRIMARY};">全</span>流程追踪</h2>'
+        f'<p style="font-size:16px;color:{C_INK_SUB};margin:0 auto 48px auto;'
+        f'max-width:560px;line-height:1.6;">'
+        f'JD 管理 · 智能匹配 · 投递跟踪 · 面试复盘 · Offer 记录，一站式求职协同'
+        f'</p></div>'
+        f'<div style="max-width:1280px;margin:0 auto;display:grid;'
+        f'grid-template-columns:7fr 3fr;gap:24px;">'
+        f'{_kanban_mock()}{_ai_pm_drawer_mock()}'
+        f'</div></div>'
+    )
+
+
+# =========================================================================
+# Section 4 — BYO-Key
+# =========================================================================
+def _model_row_mock(logo: str, name: str, endpoint: str, connected: bool) -> str:
+    if connected:
+        status_chip = (
+            f'<span style="background:{C_SUCCESS_SOFT};color:{C_SUCCESS};'
+            f'padding:2px 10px;border-radius:999px;font-size:11px;font-weight:500;">✓ 已连接</span>'
+        )
+    else:
+        status_chip = (
+            f'<span style="background:{C_BG_MUTED};color:{C_INK_MUTE};'
+            f'padding:2px 10px;border-radius:999px;font-size:11px;font-weight:500;">⏱ 未测试</span>'
+        )
+    return (
+        f'<div style="display:flex;align-items:center;gap:12px;'
+        f'padding:12px 14px;border:1px solid {C_BORDER};border-radius:10px;'
+        f'margin-bottom:8px;background:#fff;">'
+        f'<span style="font-size:20px;line-height:1;">{logo}</span>'
+        f'<div style="flex:1;min-width:0;">'
+        f'<div style="font-weight:600;font-size:13.5px;color:{C_INK};">{_html.escape(name)}</div>'
+        f'<div style="font-size:11px;color:{C_INK_MUTE};font-family:monospace;">{_html.escape(endpoint)}</div>'
+        f'</div>{status_chip}</div>'
+    )
+
+
+def _download_card_mock(ext: str, color: str, fname: str) -> str:
+    return (
+        f'<div style="border:1px solid {C_BORDER};border-radius:12px;padding:16px 14px;'
+        f'background:#fff;text-align:center;">'
+        f'<div style="display:inline-flex;width:48px;height:56px;border-radius:8px;'
+        f'background:{color};color:#fff;font-weight:800;font-size:13px;'
+        f'align-items:center;justify-content:center;margin-bottom:10px;letter-spacing:.05em;">{ext}</div>'
+        f'<div style="font-size:12.5px;color:{C_INK};font-weight:500;margin-bottom:8px;">{_html.escape(fname)}</div>'
+        f'<div style="display:inline-block;background:{C_PRIMARY};color:#fff;'
+        f'padding:4px 12px;border-radius:8px;font-size:11.5px;font-weight:600;">下载</div>'
+        f'</div>'
+    )
+
+
+def _value_tile(icon: str, title: str, sub: str) -> str:
+    return (
+        f'<div style="background:{C_BG_SOFT};border:1px solid {C_BORDER};'
+        f'border-radius:14px;padding:20px 22px;">'
+        f'<div style="font-size:24px;margin-bottom:10px;line-height:1;">{icon}</div>'
+        f'<div style="font-weight:700;color:{C_INK};font-size:14px;margin-bottom:6px;">{_html.escape(title)}</div>'
+        f'<div style="color:{C_INK_SUB};font-size:12.5px;line-height:1.6;">{_html.escape(sub)}</div>'
+        f'</div>'
+    )
+
+
+def _byo_panel_mock() -> str:
+    tab_labels = ["模型接入 Key", "PDF 简历", "DOCX 文档", "其他配置"]
+    tabs_html = "".join(
+        f'<span style="padding:8px 16px;font-size:13px;font-weight:500;'
+        f'color:{C_PRIMARY_INK if i == 0 else C_INK_SUB};'
+        f'border-bottom:2px solid {C_PRIMARY if i == 0 else "transparent"};'
+        f'margin-bottom:-1px;">{_html.escape(t)}</span>'
+        for i, t in enumerate(tab_labels)
+    )
+    return (
+        f'<div style="background:#fff;border:1px solid {C_BORDER};border-radius:16px;'
+        f'box-shadow:{S_LG};overflow:hidden;">'
+        f'<div style="display:flex;gap:4px;padding:0 24px;border-bottom:1px solid {C_BORDER};'
+        f'background:{C_BG_SOFT};">{tabs_html}</div>'
+        f'<div style="padding:28px;display:grid;grid-template-columns:7fr 5fr;gap:32px;">'
+        f'<div>'
+        f'<div style="font-size:13px;color:{C_INK_SUB};margin-bottom:12px;font-weight:500;">模型提供商列表</div>'
+        f'{_model_row_mock("🟠", "Claude (Anthropic)", "api.anthropic.com/v1", True)}'
+        f'{_model_row_mock("🟢", "OpenAI", "api.openai.com/v1", False)}'
+        f'{_model_row_mock("🔵", "Codex (OpenAI)", "navacodex.shop/v1", True)}'
+        f'{_model_row_mock("🟣", "Kimi", "api.moonshot.cn/v1", False)}'
+        f'</div>'
+        f'<div>'
+        f'<div style="font-size:13px;color:{C_INK_SUB};margin-bottom:12px;font-weight:500;">导出文件</div>'
+        f'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
+        f'{_download_card_mock("PDF", "#FF5A5A", "简历 PDF")}'
+        f'{_download_card_mock("DOCX", "#2B6FFF", "简历 DOCX")}'
+        f'</div>'
+        f'<div style="margin-top:16px;background:{C_BG_SOFT};border:1px solid {C_BORDER};'
+        f'border-radius:10px;padding:12px 14px;font-size:12px;color:{C_INK_SUB};line-height:1.6;">'
+        f'⚡ 所有文件本地生成，不上传任何服务器'
+        f'</div></div></div></div>'
+    )
+
+
+def _section_byo_key() -> None:
+    _h(
+        f'<div id="feature-3" style="padding:96px 56px;background:#fff;">'
+        f'<div style="max-width:1280px;margin:0 auto;text-align:center;">'
+        f'<h2 style="font-size:44px;font-weight:800;color:{C_INK};line-height:1.2;'
+        f'margin:0 0 14px 0;letter-spacing:-0.02em;">'
+        f'你的 <span style="color:{C_PRIMARY};">Key</span>，你的数据，你掌控</h2>'
+        f'<p style="font-size:16px;color:{C_INK_SUB};margin:0 auto 40px auto;'
+        f'max-width:640px;line-height:1.6;">'
+        f'自带 API Key（BYO-Key）接入任意大模型，数据保存在你的设备，完全本地、安全可控。'
+        f'</p></div>'
+        f'<div style="max-width:1200px;margin:0 auto;">{_byo_panel_mock()}'
+        f'<div style="margin-top:36px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px;">'
+        f'{_value_tile("🔑", "BYO-Key 自带密钥", "填入你自己的 API Key 即可开始使用，不经过第三方")}'
+        f'{_value_tile("💾", "数据本地", "简历、JD、Pipeline 全在你本地 SQLite 里")}'
+        f'{_value_tile("🛡️", "隐私优先", "不上报行为数据、无埋点、无云端同步")}'
+        f'{_value_tile("🔁", "随时切换", "Claude / OpenAI / Kimi / Codex 一键切换")}'
+        f'</div></div></div>'
+    )
+
+
+# =========================================================================
+# Footer CTA
+# =========================================================================
+def _section_footer_cta() -> None:
+    _h(
+        f'<div style="padding:96px 56px;background:linear-gradient(135deg,{C_PRIMARY} 0%, {C_PRIMARY_INK} 100%);">'
+        f'<div style="max-width:720px;margin:0 auto;text-align:center;color:#fff;">'
+        f'<h2 style="font-size:40px;font-weight:800;line-height:1.2;'
+        f'margin:0 0 14px 0;letter-spacing:-0.01em;">'
+        f'把找工作，变成一场可追踪的实验</h2>'
+        f'<p style="font-size:16px;opacity:.85;margin:0 0 36px 0;line-height:1.6;">'
+        f'免费开始，全程本地 —— 只管投简历，其它交给 CareerOS。'
+        f'</p></div></div>'
+        f'<div style="background:{C_INK};color:{C_INK_MUTE};padding:28px 56px;font-size:12.5px;">'
+        f'<div style="max-width:1280px;margin:0 auto;display:flex;'
+        f'justify-content:space-between;align-items:center;">'
+        f'<div>© 2026 CareerOS · 本地优先的求职协同工具</div>'
+        f'<div style="display:flex;gap:24px;">'
+        f'<a href="https://github.com/cryptoyc0926/careeros" target="_blank" '
+        f'style="color:inherit;text-decoration:none;">GitHub</a>'
+        f'<a href="#" style="color:inherit;text-decoration:none;">文档</a>'
+        f'<a href="#" style="color:inherit;text-decoration:none;">反馈</a>'
+        f'</div></div></div>'
+    )
+    _l, cta_mid, _r = st.columns([3, 2, 3])
+    with cta_mid:
+        if st.button("免费开始使用 →", key="landing_cta_footer",
+                     type="primary", use_container_width=True):
+            _enter_app()
+
+
+# =========================================================================
+# 渲染
+# =========================================================================
+_render_topbar()
+_section_hero()
+_section_ai_chat()
+_section_kanban()
+_section_byo_key()
+_section_footer_cta()

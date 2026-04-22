@@ -607,6 +607,45 @@ except Exception as _init_err:
     # 即使 init 失败（比如表已存在 + 不兼容变更）也让页面继续渲染，报错给用户看
     st.warning(f"数据库初始化遇到警告：{type(_init_err).__name__}: {_init_err}")
 
+
+# ── 对外 Landing 路由 ──────────────────────────────────────
+# 未 entered_app → 显示 Landing 官网；点 CTA 后 entered_app=True 走工作台
+if "entered_app" not in st.session_state:
+    st.session_state["entered_app"] = False
+
+# 允许通过 query param 跳过 landing（开发/分享直达）
+try:
+    _qp = st.query_params
+    if _qp.get("app") == "1":
+        st.session_state["entered_app"] = True
+except Exception:
+    pass
+
+if not st.session_state["entered_app"]:
+    # 执行 pages/landing.py 作为对外官网
+    # 进入时标记 "just_landed"，下次 rerun 进主应用后注入 scrollTop=0
+    st.session_state["_pending_scroll_top"] = True
+    from pathlib import Path as _P
+    _landing = _P(__file__).parent / "pages" / "landing.py"
+    if _landing.exists():
+        exec(compile(_landing.read_text(encoding="utf-8"), str(_landing), "exec"),
+             {"__file__": str(_landing)})
+        st.stop()
+
+# ── 从 Landing 进主应用时：scrollTop=0 避免继承 Landing 的滚动位置 ─
+if st.session_state.get("_pending_scroll_top"):
+    st.session_state["_pending_scroll_top"] = False
+    st.markdown(
+        "<script>"
+        "setTimeout(function(){"
+        "var m=parent.document.querySelector('[data-testid=\"stMain\"]');"
+        "if(m){m.scrollTop=0;}"
+        "window.scrollTo(0,0);"
+        "},80);"
+        "</script>",
+        unsafe_allow_html=True,
+    )
+
 # ── DEMO_MODE 全局提示条 ────────────────────────────────
 if settings.demo_mode:
     st.markdown(
@@ -658,6 +697,9 @@ nav = st.navigation(pages)
 from components.ui import divider as _apple_divider
 with st.sidebar:
     _apple_divider()
+    if st.button("← 返回首页", key="_sidebar_back_to_landing", use_container_width=True):
+        st.session_state["entered_app"] = False
+        st.rerun()
     st.caption("Career OS v0.1.0")
     if settings.has_anthropic_key:
         st.caption("AI Provider · 已连接")
