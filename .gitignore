@@ -94,3 +94,8 @@ playwright-report/
 
 # ── Streamlit 缓存 ───────────────────────────────────────
 .streamlit/cache/
+
+# ── Runtime artifacts（2026-04-22 加）─────────────────────
+logs/
+*.Rhistory
+docs/superpowers/plans/
