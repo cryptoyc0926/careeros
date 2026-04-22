@@ -1,18 +1,16 @@
-"""岗位池 — 紧凑视图 + 快速操作 + JD录入 + 链接编辑 + 一键处理。"""
+"""岗位池 — 紧凑视图 + 快速操作 + JD 录入 + 链接编辑。"""
 
 import streamlit as st
 import pandas as pd
 import math
-import json
-import yaml
-from models.database import query, execute, sync_job_to_jd, get_jd_id_for_job, has_resume_for_jd
+from models.database import query, execute, sync_job_to_jd, get_jd_id_for_job
 from services.job_filter import filter_excluded_df
-from config import settings
+from services.job_pool_render import short_action_text
 from components.ui import (
     badge, tier_badge, status_badge, jd_status_badge,
     page_header, section_title, divider, empty_state,
     summary_card_hero, soft_stat_card, apple_section_heading,
-    alert_success, alert_info, alert_warning, alert_danger,
+    alert_success, alert_info, alert_warning,
     SP_5,
 )
 
@@ -56,15 +54,12 @@ if df_all.empty:
 
 active = df_all[df_all["status"] != "已排除"]
 
-# 统计已录JD和已生成简历
+# 统计已录 JD
 jd_count = 0
-resume_count = 0
 for _, r in active.iterrows():
     jd_id = get_jd_id_for_job(r["id"])
     if jd_id:
         jd_count += 1
-        if has_resume_for_jd(jd_id):
-            resume_count += 1
 
 _n_new   = len(active[active["status"] == "NEW"])
 _n_p0    = len(active[active["等级"] == "P0"])
@@ -86,12 +81,11 @@ with main_col:
         hint=f"共 {len(active)} 个有效岗位" if len(active) else "",
     )
 with side_col:
-    s1, s2, s3, s4, s5 = st.columns(5, gap="small")
+    s1, s2, s3, s4 = st.columns(4, gap="small")
     with s1: soft_stat_card(_n_p0, "P0 重点")
     with s2: soft_stat_card(_n_app, "已投递")
     with s3: soft_stat_card(len(active), "有效岗位")
     with s4: soft_stat_card(jd_count, "已录 JD")
-    with s5: soft_stat_card(resume_count, "已生成简历")
 
 st.markdown(f'<div style="height:{SP_5}"></div>', unsafe_allow_html=True)
 
@@ -206,26 +200,22 @@ if view == "紧凑列表":
         priority = row.get("等级", "")
         score = row.get("匹配分", 0)
         link = row.get("链接", "")
-        action = row.get("今日行动", "")
+        action = short_action_text(row.get("今日行动", ""))
         status = row.get("status", "NEW")
         link_type = row.get("link_type", "🔶门户")
 
         # 检查是否已录JD
         jd_id = get_jd_id_for_job(job_id)
         has_jd = jd_id is not None
-        has_resume = has_resume_for_jd(jd_id) if has_jd else False
-
         pri_variant = {"P0": "danger", "P1": "warning", "P2": "success"}.get(priority, "muted")
 
         with st.container(border=True):
             # 主信息行
-            r1, r2, r3, r4, r5 = st.columns([3, 0.6, 1, 1.2, 0.8])
+            r1, r2, r3, r4 = st.columns([3, 0.6, 1, 1.2])
             with r1:
                 # 状态徽章
                 badges_html = badge(priority or "—", pri_variant) + f" <strong>{company}</strong> — {position}"
-                if has_resume:
-                    badges_html += " " + badge("已生成简历", "success")
-                elif has_jd:
+                if has_jd:
                     badges_html += " " + badge("已录 JD", "info")
                 cred = row.get("credibility", "")
                 if cred and "高" in cred:
@@ -239,8 +229,7 @@ if view == "紧凑列表":
                     st.markdown(f"[打开]({link})")
             with r3:
                 if action:
-                    short = action[:30] + "…" if len(action) > 30 else action
-                    st.caption(short)
+                    st.caption(action)
             with r4:
                 # 操作按钮
                 bc1, bc2, bc3 = st.columns(3)
@@ -265,190 +254,32 @@ if view == "紧凑列表":
                     if not has_jd:
                         if st.button("录入 JD", key=f"jd{job_id}", help="粘贴职位描述原文"):
                             st.session_state[f"show_jd_input_{job_id}"] = True
-                    elif not has_resume:
-                        if st.button("生成简历", key=f"gen{job_id}", help="AI 按此 JD 定制简历"):
-                            st.session_state["target_jd_id"] = jd_id
-                            st.switch_page("pages/resume_tailor.py")
-                    elif has_resume:
-                        st.caption("已完成")
-            with r5:
-                # 一键处理 — 始终可见
-                if has_resume:
-                    st.caption("已生成")
-                else:
-                    if st.button("一键处理", key=f"pipe{job_id}", help="粘贴JD→解析→打分→生成简历→PDF", type="primary"):
-                        if has_jd:
-                            st.session_state[f"run_pipeline_{job_id}"] = True
-                        else:
-                            st.session_state[f"show_jd_input_{job_id}"] = True
-                            st.session_state[f"auto_pipeline_{job_id}"] = True
+                    else:
+                        st.caption("已录 JD")
 
             # JD 录入展开区
             if st.session_state.get(f"show_jd_input_{job_id}"):
-                auto_mode = st.session_state.get(f"auto_pipeline_{job_id}", False)
-                label = f"粘贴 {company} - {position} 的 JD 原文" + ("（粘贴后点一键处理）" if auto_mode else "")
+                label = f"粘贴 {company} - {position} 的 JD 原文"
                 jd_text = st.text_area(
                     label,
                     height=150, key=f"jdtext_{job_id}",
                     placeholder="从招聘网站复制 JD 全文粘贴到这里..."
                 )
-                jd_c1, jd_c2, jd_c3 = st.columns(3)
+                jd_c1, jd_c3 = st.columns(2)
                 with jd_c1:
-                    if st.button("仅保存 JD", key=f"savejd_{job_id}"):
+                    if st.button("保存 JD", key=f"savejd_{job_id}"):
                         if jd_text and len(jd_text.strip()) > 20:
                             new_jd_id = sync_job_to_jd(job_id, jd_text.strip())
                             alert_success(f"已录入！JD #{new_jd_id}")
                             st.session_state.pop(f"show_jd_input_{job_id}", None)
-                            st.session_state.pop(f"auto_pipeline_{job_id}", None)
                             st.cache_data.clear()
                             st.rerun()
-                        else:
-                            alert_warning("JD 内容太短，请粘贴完整的职位描述。")
-                with jd_c2:
-                    if st.button("保存并一键处理", key=f"savepipe_{job_id}", type="primary"):
-                        if jd_text and len(jd_text.strip()) > 20:
-                            new_jd_id = sync_job_to_jd(job_id, jd_text.strip())
-                            st.session_state.pop(f"show_jd_input_{job_id}", None)
-                            st.session_state.pop(f"auto_pipeline_{job_id}", None)
-                            st.cache_data.clear()
-                            # 直接在这里跑 pipeline，不 rerun（避免 session 丢失）
-                            resume_path = settings.master_resume_full_path
-                            if not resume_path.exists():
-                                alert_danger("主简历文件不存在，请先在「主简历」页面创建。")
-                            else:
-                                resume_data = yaml.safe_load(resume_path.read_text(encoding="utf-8"))
-                                if not resume_data or not resume_data.get("experience"):
-                                    alert_danger("主简历内容为空或缺少工作经历。")
-                                else:
-                                    jd_clean = jd_text.strip()
-                                    with st.spinner(f"一键处理中：{company} - {position}（解析JD → 打分 → 生成简历，约30秒）..."):
-                                        try:
-                                            from services.ai_engine import auto_pipeline, AIError
-                                            result = auto_pipeline(jd_raw_text=jd_clean, resume_data=resume_data)
-                                            if "error" in result:
-                                                alert_danger(result["error"])
-                                            else:
-                                                jd_parsed = result["jd_parsed"]
-                                                execute(
-                                                    "UPDATE job_descriptions SET parsed_json=?, fit_score=?, status='resume_generated' WHERE id=?",
-                                                    (json.dumps(jd_parsed, ensure_ascii=False), result["fit_score"], new_jd_id),
-                                                )
-                                                version = query(
-                                                    "SELECT COALESCE(MAX(version),0)+1 as v FROM generated_resumes WHERE jd_id=?",
-                                                    (new_jd_id,)
-                                                )[0]["v"]
-                                                execute(
-                                                    """INSERT INTO generated_resumes (jd_id, resume_md, cover_letter_md, achievements_used, model_used, prompt_hash, version)
-                                                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                                                    (new_jd_id, result["resume_md"], result.get("cover_letter_md", ""),
-                                                     json.dumps(result.get("achievements_used", []), ensure_ascii=False),
-                                                     settings.claude_model, result.get("prompt_hash", ""), version),
-                                                )
-                                                alert_success(f"完成！匹配分: {result['fit_score']}%，简历 v{version} 已保存")
-                                                with st.expander("查看生成的简历", expanded=True):
-                                                    st.markdown(result["resume_md"])
-                                                    try:
-                                                        from services.pdf_export import markdown_to_pdf
-                                                        pdf_path = markdown_to_pdf(result["resume_md"])
-                                                        with open(pdf_path, "rb") as f:
-                                                            st.download_button(
-                                                                "下载 PDF",
-                                                                data=f.read(),
-                                                                file_name=f"{company}_{position}_简历.pdf",
-                                                                mime="application/pdf",
-                                                                key=f"pdf_new_{job_id}",
-                                                            )
-                                                    except Exception as e:
-                                                        st.caption(f"PDF 导出失败: {e}")
-                                                if result.get("cover_letter_md"):
-                                                    with st.expander("求职信"):
-                                                        st.markdown(result["cover_letter_md"])
-                                                st.cache_data.clear()
-                                        except Exception as e:
-                                            alert_danger(f"一键处理失败: {e}")
                         else:
                             alert_warning("JD 内容太短，请粘贴完整的职位描述。")
                 with jd_c3:
                     if st.button("取消", key=f"canceljd_{job_id}"):
                         st.session_state.pop(f"show_jd_input_{job_id}", None)
-                        st.session_state.pop(f"auto_pipeline_{job_id}", None)
                         st.rerun()
-
-            # 一键处理流程
-            if st.session_state.get(f"run_pipeline_{job_id}"):
-                if not has_jd:
-                    alert_warning("请先录入 JD 再使用一键处理。")
-                    del st.session_state[f"run_pipeline_{job_id}"]
-                else:
-                    # 读取 JD 原文
-                    jd_row = query("SELECT raw_text FROM job_descriptions WHERE id=?", (jd_id,))
-                    if jd_row and jd_row[0]["raw_text"]:
-                        resume_path = settings.master_resume_full_path
-                        if not resume_path.exists():
-                            alert_danger("主简历文件不存在，请先在「主简历」页面创建。")
-                        else:
-                            resume_data = yaml.safe_load(resume_path.read_text(encoding="utf-8"))
-                            if not resume_data or not resume_data.get("experience"):
-                                alert_danger("主简历内容为空或缺少工作经历。")
-                            else:
-                                with st.spinner(f"一键处理中：{company} - {position}（解析JD → 打分 → 生成简历，约30秒）..."):
-                                    try:
-                                        from services.ai_engine import auto_pipeline, AIError
-                                        result = auto_pipeline(
-                                            jd_raw_text=jd_row[0]["raw_text"],
-                                            resume_data=resume_data,
-                                        )
-                                        if "error" in result:
-                                            alert_danger(result["error"])
-                                        else:
-                                            # 保存解析结果
-                                            jd_parsed = result["jd_parsed"]
-                                            execute(
-                                                "UPDATE job_descriptions SET parsed_json=?, fit_score=?, status='resume_generated' WHERE id=?",
-                                                (json.dumps(jd_parsed, ensure_ascii=False), result["fit_score"], jd_id),
-                                            )
-                                            # 保存简历
-                                            version = query(
-                                                "SELECT COALESCE(MAX(version),0)+1 as v FROM generated_resumes WHERE jd_id=?",
-                                                (jd_id,)
-                                            )[0]["v"]
-                                            execute(
-                                                """INSERT INTO generated_resumes (jd_id, resume_md, cover_letter_md, achievements_used, model_used, prompt_hash, version)
-                                                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                                                (jd_id, result["resume_md"], result.get("cover_letter_md", ""),
-                                                 json.dumps(result.get("achievements_used", []), ensure_ascii=False),
-                                                 settings.claude_model, result.get("prompt_hash", ""), version),
-                                            )
-                                            alert_success(f"完成！匹配分: {result['fit_score']}%，简历 v{version} 已保存")
-
-                                            # 展示简历 + PDF 下载
-                                            with st.expander("查看生成的简历", expanded=True):
-                                                st.markdown(result["resume_md"])
-                                                try:
-                                                    from services.pdf_export import markdown_to_pdf
-                                                    pdf_path = markdown_to_pdf(result["resume_md"])
-                                                    with open(pdf_path, "rb") as f:
-                                                        st.download_button(
-                                                            "下载 PDF",
-                                                            data=f.read(),
-                                                            file_name=f"{company}_{position}_简历.pdf",
-                                                            mime="application/pdf",
-                                                            key=f"pdf_{job_id}",
-                                                        )
-                                                except Exception as e:
-                                                    st.caption(f"PDF 导出失败: {e}")
-
-                                            if result.get("cover_letter_md"):
-                                                with st.expander("求职信"):
-                                                    st.markdown(result["cover_letter_md"])
-
-                                            st.cache_data.clear()
-                                    except Exception as e:
-                                        alert_danger(f"一键处理失败: {e}")
-                    else:
-                        alert_danger("JD 原文为空。")
-                    if f"run_pipeline_{job_id}" in st.session_state:
-                        del st.session_state[f"run_pipeline_{job_id}"]
 
             # 链接编辑展开区
             if st.session_state.get(f"show_edit_{job_id}"):
