@@ -867,40 +867,82 @@ def _section_kanban() -> None:
 # =========================================================================
 # Section 4 — BYO-Key
 # =========================================================================
-def _model_row_mock(logo: str, name: str, endpoint: str, connected: bool) -> str:
-    if connected:
-        status_chip = (
-            f'<span style="background:{C_SUCCESS_SOFT};color:{C_SUCCESS};'
-            f'padding:2px 10px;border-radius:999px;font-size:11px;font-weight:500;">✓ 已连接</span>'
-        )
-    else:
-        status_chip = (
-            f'<span style="background:{C_BG_MUTED};color:{C_INK_MUTE};'
-            f'padding:2px 10px;border-radius:999px;font-size:11px;font-weight:500;">⏱ 未测试</span>'
-        )
+def _model_row_mock(icon: str, name: str, masked_key: str) -> str:
     return (
-        f'<div style="display:flex;align-items:center;gap:12px;'
-        f'padding:12px 14px;border:1px solid {C_BORDER};border-radius:10px;'
-        f'margin-bottom:8px;background:#fff;">'
-        f'<span style="font-size:20px;line-height:1;">{logo}</span>'
+        f'<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;'
+        f'border:1px solid {C_BORDER};border-radius:12px;margin-bottom:9px;background:#fff;">'
+        f'<span style="display:inline-flex;width:34px;height:34px;border-radius:9px;'
+        f'background:{C_INK};color:#fff;align-items:center;justify-content:center;'
+        f'font-size:13px;font-weight:900;flex-shrink:0;">{_html.escape(icon)}</span>'
         f'<div style="flex:1;min-width:0;">'
-        f'<div style="font-weight:600;font-size:13.5px;color:{C_INK};">{_html.escape(name)}</div>'
-        f'<div style="font-size:11px;color:{C_INK_MUTE};font-family:monospace;">{_html.escape(endpoint)}</div>'
-        f'</div>{status_chip}</div>'
+        f'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:3px;">'
+        f'<span style="font-weight:800;font-size:13.5px;color:{C_INK};">{_html.escape(name)}</span>'
+        f'<span style="background:{C_SUCCESS_SOFT};color:{C_SUCCESS};border-radius:999px;'
+        f'padding:2px 8px;font-size:10.5px;font-weight:800;">● 已配置</span>'
+        f'</div>'
+        f'<div style="font-size:11.5px;color:{C_INK_MUTE};font-family:monospace;">{_html.escape(masked_key)}</div>'
+        f'</div>'
+        f'<span style="border:1px solid {C_BORDER};border-radius:9px;padding:6px 11px;'
+        f'font-size:12px;font-weight:800;color:{C_INK_SUB};background:#fff;white-space:nowrap;">管理</span>'
+        f'</div>'
     )
 
 
-def _download_card_mock(ext: str, color: str, fname: str) -> str:
+def _byo_safety_note_mock() -> str:
     return (
-        f'<div style="border:1px solid {C_BORDER};border-radius:12px;padding:16px 14px;'
-        f'background:#fff;text-align:center;">'
-        f'<div style="display:inline-flex;width:48px;height:56px;border-radius:8px;'
-        f'background:{color};color:#fff;font-weight:800;font-size:13px;'
-        f'align-items:center;justify-content:center;margin-bottom:10px;letter-spacing:.05em;">{ext}</div>'
-        f'<div style="font-size:12.5px;color:{C_INK};font-weight:500;margin-bottom:8px;">{_html.escape(fname)}</div>'
-        f'<div style="display:inline-block;background:{C_PRIMARY};color:#fff;'
-        f'padding:4px 12px;border-radius:8px;font-size:11.5px;font-weight:600;">下载</div>'
+        f'<div style="margin-top:16px;background:{C_PRIMARY_SOFT};border:1px solid rgba(59,91,254,.16);'
+        f'border-radius:13px;padding:15px 16px;position:relative;">'
+        f'<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;">'
+        f'<div style="font-size:13px;font-weight:900;color:{C_PRIMARY_INK};">🛡 数据安全与隐私</div>'
+        f'<span style="background:#fff;color:{C_PRIMARY_INK};border-radius:999px;'
+        f'padding:3px 9px;font-size:10.5px;font-weight:800;white-space:nowrap;">本地优先 · 端到端加密</span>'
         f'</div>'
+        f'<div style="font-size:12px;color:{C_PRIMARY_INK};line-height:1.65;">'
+        f'所有简历内容、API Key 与生成记录仅存储在你的本地设备，我们无法访问你的数据，也不会用于任何训练或分析。'
+        f'</div>'
+    )
+
+
+def _download_card_mock(ext: str, color: str, title: str, sub: str) -> str:
+    return (
+        f'<div style="border:1px solid {C_BORDER};border-radius:13px;padding:16px 14px;'
+        f'background:#fff;text-align:center;box-shadow:0 1px 2px rgba(11,18,32,.04);">'
+        f'<div style="display:inline-flex;width:46px;height:52px;border-radius:9px;'
+        f'background:{color};color:#fff;font-weight:900;font-size:12px;'
+        f'align-items:center;justify-content:center;margin-bottom:10px;letter-spacing:.04em;">{_html.escape(ext)}</div>'
+        f'<div style="font-size:13px;color:{C_INK};font-weight:900;margin-bottom:3px;">{_html.escape(title)}</div>'
+        f'<div style="font-size:11.5px;color:{C_INK_MUTE};">{_html.escape(sub)}</div>'
+        f'</div>'
+    )
+
+
+def _byo_version_history_mock() -> str:
+    rows = [
+        ("●", "v2.4 高级运营定制版", "当前版本", "今天 14:32", True),
+        ("○", "v2.3 技术运营定制版", "", "昨天 20:15", False),
+        ("○", "v2.2 产品运营定制版", "", "06-01 18:42", False),
+        ("○", "v2.1 主简历（基础版）", "", "05-30 11:27", False),
+    ]
+    rows_html = ""
+    for dot, title, chip, time_text, active in rows:
+        rows_html += (
+            f'<div style="display:grid;grid-template-columns:18px 1fr auto;gap:8px;'
+            f'align-items:center;padding:9px 0;border-bottom:1px solid {C_BORDER if title != rows[-1][1] else "transparent"};">'
+            f'<span style="color:{C_PRIMARY if active else C_INK_MUTE};font-size:13px;text-align:center;">{dot}</span>'
+            f'<span style="display:flex;align-items:center;gap:7px;min-width:0;">'
+            f'<span style="font-size:12.5px;font-weight:{800 if active else 600};color:{C_INK if active else C_INK_SUB};'
+            f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{_html.escape(title)}</span>'
+            f'{f"<span style=\"background:{C_PRIMARY_SOFT};color:{C_PRIMARY_INK};border-radius:999px;padding:2px 8px;font-size:10.5px;font-weight:800;white-space:nowrap;\">{chip}</span>" if chip else ""}'
+            f'</span>'
+            f'<span style="font-size:11px;color:{C_INK_MUTE};white-space:nowrap;">{_html.escape(time_text)}</span>'
+            f'</div>'
+        )
+    return (
+        f'<div style="margin-top:18px;">'
+        f'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+        f'<div style="font-size:14px;font-weight:900;color:{C_INK};">版本历史</div>'
+        f'<span style="font-size:12px;color:{C_PRIMARY_INK};font-weight:800;">查看全部</span>'
+        f'</div>{rows_html}</div>'
     )
 
 
@@ -916,9 +958,9 @@ def _value_tile(icon: str, title: str, sub: str) -> str:
 
 
 def _byo_panel_mock() -> str:
-    tab_labels = ["模型接入 Key", "PDF 简历", "DOCX 文档", "其他配置"]
+    tab_labels = ["在线简历编辑", "PDF 预览", "深度评估"]
     tabs_html = "".join(
-        f'<span style="padding:8px 16px;font-size:13px;font-weight:500;'
+        f'<span style="padding:10px 18px;font-size:13px;font-weight:800;'
         f'color:{C_PRIMARY_INK if i == 0 else C_INK_SUB};'
         f'border-bottom:2px solid {C_PRIMARY if i == 0 else "transparent"};'
         f'margin-bottom:-1px;">{_html.escape(t)}</span>'
@@ -931,42 +973,59 @@ def _byo_panel_mock() -> str:
         f'background:{C_BG_SOFT};">{tabs_html}</div>'
         f'<div style="padding:28px;display:grid;grid-template-columns:7fr 5fr;gap:32px;">'
         f'<div>'
-        f'<div style="font-size:13px;color:{C_INK_SUB};margin-bottom:12px;font-weight:500;">模型提供商列表</div>'
-        f'{_model_row_mock("🟠", "Claude (Anthropic)", "api.anthropic.com/v1", True)}'
-        f'{_model_row_mock("🟢", "OpenAI", "api.openai.com/v1", False)}'
-        f'{_model_row_mock("🔵", "Codex (OpenAI)", "navacodex.shop/v1", True)}'
-        f'{_model_row_mock("🟣", "Kimi", "api.moonshot.cn/v1", False)}'
+        f'<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px;">'
+        f'<div style="font-size:15px;color:{C_INK};font-weight:900;">模型服务与 Key 管理</div>'
+        f'<span style="background:{C_PRIMARY_SOFT};color:{C_PRIMARY_INK};border-radius:999px;'
+        f'padding:3px 9px;font-size:11px;font-weight:800;">BYO-Key</span>'
+        f'</div>'
+        f'<div style="font-size:12.5px;color:{C_INK_SUB};line-height:1.6;margin-bottom:14px;">'
+        f'使用你自己的 API Key，数据仅在本地处理，不会上传至任何服务器。</div>'
+        f'{_model_row_mock("A", "Claude (Anthropic)", "sk-ant-****-****-****")}'
+        f'{_model_row_mock("Ⓞ", "OpenAI", "sk-proj-****-****-****")}'
+        f'{_model_row_mock("◆", "Codex (OpenAI)", "sk-codex-****-****-****")}'
+        f'{_model_row_mock("K", "Kimi", "sk-kimi-****-****-****")}'
+        f'<div style="border:1px dashed {C_BORDER};border-radius:12px;padding:11px 12px;'
+        f'text-align:center;color:{C_INK_SUB};font-size:12.5px;font-weight:800;background:#fff;">+ 添加自定义模型</div>'
+        f'{_byo_safety_note_mock()}'
         f'</div>'
         f'<div>'
-        f'<div style="font-size:13px;color:{C_INK_SUB};margin-bottom:12px;font-weight:500;">导出文件</div>'
-        f'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
-        f'{_download_card_mock("PDF", "#FF5A5A", "简历 PDF")}'
-        f'{_download_card_mock("DOCX", "#2B6FFF", "简历 DOCX")}'
+        f'<div style="font-size:15px;color:{C_INK};font-weight:900;margin-bottom:5px;">导出与下载</div>'
+        f'<div style="font-size:12.5px;color:{C_INK_SUB};line-height:1.6;margin-bottom:14px;">'
+        f'导出即带走，支持原稿与改写版本。</div>'
+        f'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">'
+        f'{_download_card_mock("PDF", "#EF4444", "导出 PDF", "（原稿）")}'
+        f'{_download_card_mock("DOCX", "#2563EB", "导出 DOCX", "（原稿改写）")}'
+        f'{_download_card_mock("DOCX", "#2563EB", "导出 DOCX", "（模板版）")}'
         f'</div>'
-        f'<div style="margin-top:16px;background:{C_BG_SOFT};border:1px solid {C_BORDER};'
-        f'border-radius:10px;padding:12px 14px;font-size:12px;color:{C_INK_SUB};line-height:1.6;">'
-        f'⚡ 所有文件本地生成，不上传任何服务器'
-        f'</div></div></div></div>'
+        f'{_byo_version_history_mock()}'
+        f'</div></div></div>'
     )
 
 
 def _section_byo_key() -> None:
     _h(
         f'<div id="feature-3" style="padding:96px 56px;background:#fff;">'
-        f'<div style="max-width:1280px;margin:0 auto;text-align:center;">'
+        f'<div style="max-width:1280px;margin:0 auto 40px auto;display:grid;'
+        f'grid-template-columns:1fr auto;gap:24px;align-items:start;">'
+        f'<div style="text-align:left;">'
         f'<h2 style="font-size:44px;font-weight:800;color:{C_INK};line-height:1.2;'
         f'margin:0 0 14px 0;letter-spacing:-0.02em;">'
         f'你的 <span style="color:{C_PRIMARY};">Key</span>，你的数据，你掌控</h2>'
-        f'<p style="font-size:16px;color:{C_INK_SUB};margin:0 auto 40px auto;'
+        f'<p style="font-size:16px;color:{C_INK_SUB};margin:0;'
         f'max-width:640px;line-height:1.6;">'
-        f'自带 API Key（BYO-Key）接入任意大模型，数据保存在你的设备，完全本地、安全可控。'
+        f'自带 API Key（BYO-Key）接入任意大模型，数据仅存储在你的设备，导出即带走，安全可控。'
         f'</p></div>'
+        f'<div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap;padding-top:4px;">'
+        f'<span style="background:{C_PRIMARY_SOFT};color:{C_PRIMARY_INK};border-radius:999px;'
+        f'padding:5px 11px;font-size:12px;font-weight:800;">🛡 BYO-Key 隐私优先</span>'
+        f'<span style="background:{C_PRIMARY_SOFT};color:{C_PRIMARY_INK};border-radius:999px;'
+        f'padding:5px 11px;font-size:12px;font-weight:800;">🔒 数据本地加密存储</span>'
+        f'</div></div>'
         f'<div style="max-width:1200px;margin:0 auto;">{_byo_panel_mock()}'
-        f'<div style="margin-top:36px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px;">'
-        f'{_value_tile("🔑", "BYO-Key 自带密钥", "填入你自己的 API Key 即可开始使用，不经过第三方")}'
-        f'{_value_tile("💾", "数据本地", "简历、JD、Pipeline 全在你本地 SQLite 里")}'
-        f'{_value_tile("🛡️", "隐私优先", "不上报行为数据、无埋点、无云端同步")}'
-        f'{_value_tile("🔁", "随时切换", "Claude / OpenAI / Kimi / Codex 一键切换")}'
+        f'<div style="margin-top:36px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">'
+        f'{_value_tile("🔑", "BYO-Key 自带密钥", "支持 Claude / OpenAI / Codex / Kimi 等主流模型，自带 Key，更自由，更安全。")}'
+        f'{_value_tile("🔒", "隐私优先", "数据本地处理与存储，端到端加密，不上传、不共享、不训练。")}'
+        f'{_value_tile("⬇", "随时导出", "PDF / DOCX 一键导出，原稿 / 改写 / 模板多格式，随时带走你的成果。")}'
         f'</div></div></div>'
     )
 
