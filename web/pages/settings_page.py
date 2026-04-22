@@ -9,6 +9,8 @@ from components.ui import (
     page_shell_header, section_title, divider, badge, apple_section_heading,
     path_row_card, alert_success, alert_warning, alert_danger, alert_info,
 )
+from services.action_status import format_action_status_caption, get_all_action_status, record_action_status
+from services.provider_health import ping_current_provider
 
 page_shell_header(
     title="系统设置",
@@ -287,19 +289,22 @@ else:
 col_test, _ = st.columns([1, 3])
 with col_test:
     if st.button("测试连接", disabled=not settings.has_anthropic_key, help="发送一次最小 API 调用，验证 Key / 端点 / 模型是否可用"):
-        try:
-            from services.llm_client import make_client, friendly_error
-            client = make_client()
-            resp = client.messages.create(
-                model=settings.claude_model,
-                max_tokens=16,
-                messages=[{"role": "user", "content": "ping"}],
+        record_action_status(st.session_state, "provider_ping", "running", "正在测试连接")
+        result = ping_current_provider()
+        if result.ok:
+            record_action_status(
+                st.session_state,
+                "provider_ping",
+                "success",
+                f"{result.label} · {result.model} · 回复：{result.reply[:40]}",
             )
-            reply = resp.content[0].text if resp.content else "(空响应，但连接成功)"
-            alert_success(f"✓ 连接成功 · 模型 `{settings.claude_model}` 可用 · 回复：{reply[:40]}")
-        except Exception as e:
-            from services.llm_client import friendly_error
-            alert_danger(f"✗ {friendly_error(e)}")
+            alert_success(f"连接成功 · 模型 `{result.model}` 可用 · 回复：{result.reply[:40]}")
+        else:
+            record_action_status(st.session_state, "provider_ping", result.status, result.message)
+            alert_danger(result.message)
+    _provider_ping_caption = format_action_status_caption(st.session_state, "provider_ping")
+    if _provider_ping_caption:
+        st.caption(_provider_ping_caption)
 
 # ── SMTP 邮件配置 ─────────────────────────────────────────
 divider()
@@ -524,6 +529,28 @@ else:
     if st.button("清空错误日志", key="clear_error_log"):
         st.session_state["_error_log"] = []
         st.rerun()
+
+# ══════════════════════════════════════════════════════════
+# 最近动作状态（session 级，关闭页面就清空）
+# ══════════════════════════════════════════════════════════
+divider()
+apple_section_heading(
+    "最近动作",
+    subtitle="本次浏览器会话内按钮和任务的运行状态，便于确认动作是否真的执行。",
+)
+
+_all_actions = get_all_action_status(st.session_state)
+if not _all_actions:
+    st.caption("（暂无动作记录）")
+else:
+    for key, payload in sorted(
+        _all_actions.items(),
+        key=lambda item: item[1].get("last_time") or "",
+        reverse=True,
+    ):
+        message = payload.get("message") or ""
+        suffix = f" · {message}" if message else ""
+        st.markdown(f"- `{key}` · **{payload.get('status', '')}** · {payload.get('last_time', '-')}{suffix}")
 
 # ══════════════════════════════════════════════════════════
 # 目标公司管理（P0 / P1 / 排除清单 + 内推码）
