@@ -663,31 +663,25 @@ if settings.demo_mode:
 
 # ── 导航 ──────────────────────────────────────────────────
 pages = {
-    "仪表盘": [
-        st.Page("pages/home.py",      title="首页",    default=True),
-        st.Page("pages/analytics.py", title="数据分析"),
+    "": [
+        st.Page("pages/home.py", title="总览", default=True),
     ],
-    "目标岗位": [
-        st.Page("pages/jd_input.py",   title="添加岗位 JD"),
-        st.Page("pages/jd_browser.py", title="浏览 JD 库"),
-        st.Page("pages/job_pool.py",   title="岗位池"),
+    "简历定制": [
+        st.Page("pages/resume_tailor.py",    title="在线定制"),
+        st.Page("pages/history_versions.py", title="历史版本"),
+        st.Page("pages/master_resume.py",    title="简历管理"),
+        st.Page("pages/resume_templates.py", title="简历模板"),
     ],
-    "简历管理": [
-        st.Page("pages/master_resume.py",  title="主简历"),
-        st.Page("pages/resume_tailor.py",  title="在线定制编辑"),
-        st.Page("pages/star_pool.py",      title="经历素材库"),
+    "求职工具": [
+        st.Page("pages/job_pool.py",          title="岗位池"),
     ],
-    "投递进度": [
-        st.Page("pages/pipeline.py",        title="看板追踪"),
-        st.Page("pages/followup.py",        title="跟进提醒"),
-        st.Page("pages/email_composer.py",  title="邮件撰写"),
-    ],
-    "面试准备": [
-        st.Page("pages/interview.py",      title="模拟面试"),
-        st.Page("pages/interview_prep.py", title="题库 & 故事"),
+    "资源中心": [
+        st.Page("pages/star_pool.py",    title="素材库"),
+        st.Page("pages/case_library.py", title="案例库"),
     ],
     "系统": [
         st.Page("pages/settings_page.py", title="设置"),
+        st.Page("pages/help_feedback.py", title="帮助反馈"),
     ],
 }
 
