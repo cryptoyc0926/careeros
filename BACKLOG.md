@@ -54,6 +54,13 @@
 
 ## Discovered（运行中 Ralph append）
 
+### 轮次 7 学习（未产生 code commit）
+
+- **避让 Codex WIP**：Codex 在 resume_tailor 区活跃写入（staged `web/components/resume_canvas.py`、worktree M `web/services/resume_tailor.py` / `web/tests/test_resume_tailor_validation_flow.py`，刚 commit `74d1279 RT-05 3-col 1:2:1`）。本轮不碰这些文件。
+- **st.page_link URL 生成 bug**（Streamlit 1.38）：`st.Page(..., title="中文", url_path="jd_input")` 给 page_link 生成的 href 仍是 `http://localhost:8501/<urlencoded-中文-title>`，而不是 `/jd_input`。点击 fall back 到 home。url_path 参数被忽略。
+  - 尝试过：home.py 用 st.page_link 替代 feature_card + 给 st.Page 加 url_path — 两改动都无效，已 git checkout 回滚
+  - 结论：不能用 st.page_link 解决 anchor intercept 问题。Streamlit 要升级或换思路（可能用 `st.button + st.switch_page` 做成卡片样式）
+
 - [x] Sidebar "View more / View less" 本地化为 "查看更多 / 收起"（ralph/1）
 - [x] ~~Landing 免费体验按钮 click 不切 session~~ 误报 — click 生效但 Streamlit rerun 有延迟，上轮截图太快（ralph/2 排除）
 - [~] 主仪表盘"接下来做什么"3 个卡片 + "常用入口"3 个卡片整页 `<a href>` 导航（ralph/2 部分修复）：
