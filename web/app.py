@@ -760,7 +760,10 @@ pages = {
         st.Page("pages/resume_templates.py", title="简历模板"),
     ],
     "求职工具": [
-        st.Page("pages/job_pool.py",          title="岗位池"),
+        st.Page("pages/job_pool.py",   title="岗位池"),
+        st.Page("pages/jd_input.py",   title="添加 JD"),
+        st.Page("pages/jd_browser.py", title="浏览 JD"),
+        st.Page("pages/analytics.py",  title="数据分析"),
     ],
     "资源中心": [
         st.Page("pages/star_pool.py",    title="素材库"),

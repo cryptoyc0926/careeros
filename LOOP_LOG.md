@@ -27,6 +27,7 @@ N | TIMESTAMP | VERDICT | TASK | COMMIT_OR_ROLLBACK | SCREENSHOT
 2 | 2026-04-23 04:00 | PARTIAL | home 卡片 href 追加 ?app=1 防 fallback 到 landing；完整 path routing 修复留给 ralph/3 | 51c7197 | inline
 3 | 2026-04-23 04:08 | PASS | scroll reset 脚本迁 components.v1.html + selector 兼容 1.38+（section.main 多选器兜底） | a8cce90 | inline
 4 | 2026-04-23 04:17 | PASS | 隐藏 Streamlit 默认 Deploy 按钮 + 巡检 resume_tailor/history/master_resume/job_pool 4 页均正常 | cd0da62 | inline
+5 | 2026-04-23 04:25 | PASS | **P0 死链修复** 注册 jd_input/jd_browser/analytics 到 nav「求职工具」组，home 3 张卡 + hero "看数据分析" CTA 全部不再 404 | <待commit> | inline
 ```
 
 ## 备注
