@@ -1,7 +1,7 @@
 """
-Career OS — UI 组件库 v4 (Nature × Apple, Apple-native tokens)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Design 基线：Apple DESIGN.md (getdesign.md/apple) + Nature 气质
+Career OS — UI 组件库 v4 (Indigo White tokens)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Design 基线：new UI 靛蓝白体系 + Nature 气质
 
 全部 token 从 Appendix A 落地；删除 Instrument Serif；删除左竖条/顶横条系统；
 保留所有旧组件名作为 delegate（向后兼容），新代码请使用新组件名。
@@ -13,27 +13,27 @@ import streamlit as st
 #  Appendix A — Design Tokens
 # ═════════════════════════════════════════════════════════════
 
-# ── Surface / Background ──
-BG_PAGE    = "#f5f5f7"
-BG_SURFACE = "#ffffff"
-BG_SOFT    = "#fafafc"
-BG_SUNKEN  = "#ededf0"
+# ── Surface / Background ──（Indigo v1）
+BG_PAGE    = "#FFFFFF"            # 主页面底
+BG_SURFACE = "#F7F8FA"            # section 分层底
+BG_SOFT    = "#FAFBFC"
+BG_SUNKEN  = "#EEF1F5"
 
-# ── Text ──
-TEXT_STRONG = "#1d1d1f"
-TEXT_BODY   = "#424245"
-TEXT_MUTED  = "#6e6e73"
-TEXT_DIM    = "rgba(29,29,31,0.48)"
+# ── Text ──（靛蓝黑，可读性最佳）
+TEXT_STRONG = "#0B1220"           # H1/H2 主文字
+TEXT_BODY   = "#374151"           # 正文
+TEXT_MUTED  = "#6B7280"           # 次级
+TEXT_DIM    = "rgba(11,18,32,0.48)"
 
 # ── Border ──
-BORDER_SOFT   = "rgba(29,29,31,0.08)"
-BORDER_SOFTER = "rgba(29,29,31,0.04)"
-BORDER_FOCUS  = "#0071e3"
+BORDER_SOFT   = "#E5E7EB"
+BORDER_SOFTER = "rgba(11,18,32,0.04)"
+BORDER_FOCUS  = "#3B5BFE"         # ← 靛蓝 focus ring
 
-# ── Accent ──
-ACCENT_BLUE    = "#0071e3"
-ACCENT_BLUE_HV = "#005bb5"
-ACCENT_INDIGO  = "#5b69f5"  # 仅 chart highlight
+# ── Accent ──（Indigo #3B5BFE）
+ACCENT_BLUE    = "#3B5BFE"
+ACCENT_BLUE_HV = "#2A46D8"
+ACCENT_INDIGO  = "#1E3AE8"        # chart highlight / 深靛蓝
 
 # ── Semantic ──
 SEMANTIC_SUCCESS = "#16a34a"
@@ -46,17 +46,19 @@ RADIUS_SM, RADIUS_MD, RADIUS_LG, RADIUS_PILL = "6px", "10px", "14px", "980px"
 # ── Shadow ──
 SHADOW_CARD = "0 1px 2px rgba(0,0,0,0.04)"
 SHADOW_HOVR = "0 8px 24px rgba(0,0,0,0.08)"
-# Apple Material Motion 缓动（cubic-bezier(0.4, 0, 0.2, 1) = Material Standard）
-EASING_APPLE = "cubic-bezier(0.4, 0, 0.2, 1)"
+# Standard motion easing
+EASING_STANDARD = "cubic-bezier(0.4, 0, 0.2, 1)"
 SHADOW_HERO = "0 8px 32px rgba(0,0,0,0.06)"
 
 # ── Spacing ──
 SP_1, SP_2, SP_3, SP_4 = "4px", "8px", "12px", "16px"
 SP_5, SP_6, SP_7, SP_8 = "24px", "32px", "48px", "64px"
 
-# ── Typography ──
-FONT_SANS = ("'SF Pro Text', 'SF Pro Display', -apple-system, BlinkMacSystemFont, "
-             "'PingFang SC', 'Helvetica Neue', Inter, 'Noto Sans SC', sans-serif")
+# ── Typography ──（Indigo v1: Inter 为首 + 保留 SF/PingFang fallback）
+# ⚠️ 单引号包字体名：此常量被 f-string 插入到 inline style="..."，
+#    如果内层用双引号会和外层 style="..." 冲突，导致 HTML 属性提前闭合
+FONT_SANS = ("'Inter','SF Pro Text','SF Pro Display',-apple-system,BlinkMacSystemFont,"
+             "'PingFang SC','Helvetica Neue','Noto Sans SC',sans-serif")
 
 # ── Legacy alias（向后兼容，供未迁移的内页使用）──
 FG, MUTED, ACCENT, BORDER, SEC_BG, WHITE = (
@@ -73,8 +75,8 @@ COLORS = {
     "success": (SEMANTIC_SUCCESS, "rgba(22,163,74,0.08)"),
     "warning": (SEMANTIC_WARNING, "rgba(217,119,6,0.08)"),
     "danger":  (SEMANTIC_DANGER,  "rgba(220,38,38,0.08)"),
-    "info":    (ACCENT_BLUE,      "rgba(0,113,227,0.08)"),
-    "accent":  (ACCENT_BLUE,      "rgba(0,113,227,0.08)"),
+    "info":    (ACCENT_BLUE,      "rgba(59,91,254,0.08)"),   # ← 靛蓝 chip 浅底
+    "accent":  (ACCENT_BLUE,      "rgba(59,91,254,0.08)"),
     "muted":   (TEXT_MUTED,       "rgba(0,0,0,0.03)"),
     "purple":  ("#7c3aed", "rgba(124,58,237,0.08)"),
     "orange":  ("#ea580c", "rgba(234,88,12,0.08)"),
@@ -208,7 +210,7 @@ def hero_intro_block(
     primary: tuple[str, str] | None = None,
     secondary: tuple[str, str] | None = None,
 ) -> None:
-    """Apple 式 Hero。上下结构，居中对齐，与页面底色融合。"""
+    """居中 Hero。上下结构，与页面底色融合。"""
     st.markdown(
         f'<div style="padding:{SP_7} {SP_5} {SP_5};text-align:center;'
         f'font-family:{FONT_SANS}">'
@@ -293,7 +295,7 @@ def task_action_card(title: str, description: str, page: str) -> None:
         f'style="text-decoration:none;'
         f'background:{BG_SURFACE};border:1px solid {BORDER_SOFTER};'
         f'border-radius:{RADIUS_LG};padding:{SP_5};box-shadow:{SHADOW_CARD};'
-        f'transition:all 0.22s {EASING_APPLE};cursor:pointer;font-family:{FONT_SANS};'
+        f'transition:all 0.22s {EASING_STANDARD};cursor:pointer;font-family:{FONT_SANS};'
         f'min-height:132px;display:flex;flex-direction:column;justify-content:space-between">'
         f'<span style="display:block">'
         f'<span style="display:block;font-size:15px;font-weight:600;color:{TEXT_STRONG};'
@@ -318,7 +320,7 @@ def feature_card(title: str, description: str, page: str) -> None:
         f'style="text-decoration:none;'
         f'background:{BG_SURFACE};border:1px solid {BORDER_SOFTER};'
         f'border-radius:{RADIUS_LG};padding:{SP_5};box-shadow:{SHADOW_CARD};'
-        f'transition:all 0.22s {EASING_APPLE};cursor:pointer;font-family:{FONT_SANS};'
+        f'transition:all 0.22s {EASING_STANDARD};cursor:pointer;font-family:{FONT_SANS};'
         f'min-height:112px;display:flex;flex-direction:column;justify-content:space-between">'
         f'<span style="display:block">'
         f'<span style="display:block;font-size:15px;font-weight:600;color:{TEXT_STRONG};'
@@ -342,11 +344,11 @@ def app_footer(text: str = "") -> None:
 
 
 # ═════════════════════════════════════════════════════════════
-#  Appendix G — 新增 Apple 化组件（替代内联 HTML 拼接）
+#  Appendix G — 新增靛蓝白组件（替代内联 HTML 拼接）
 # ═════════════════════════════════════════════════════════════
 
 def funnel_stage_card(label: str, count: int, rate_hint: str = "") -> None:
-    """漏斗阶段卡（Apple Blue 单色 + tabular-nums）。"""
+    """漏斗阶段卡（Indigo 单色 + tabular-nums）。"""
     hint_html = (
         f'<div style="font-size:11px;color:{TEXT_MUTED};margin-bottom:{SP_2};'
         f'font-family:{FONT_SANS}">{rate_hint}</div>'
@@ -366,7 +368,7 @@ def funnel_stage_card(label: str, count: int, rate_hint: str = "") -> None:
 
 
 def diagnostic_alert(severity: str, message: str, copyable: bool = False) -> None:
-    """诊断信息条（Apple 风格，无 emoji，只用颜色+文字）。
+    """诊断信息条（靛蓝白风格，无 emoji，只用颜色+文字）。
 
     severity: success | info | warning | danger
     copyable: True 时额外追加一个可复制的 code block（st.code 右上角自带 copy 按钮）
@@ -413,7 +415,7 @@ def alert_danger(message: str, copyable: bool = True) -> None:
 
 
 def score_hero_card(score: int, verdict: str = "", hint: str = "") -> None:
-    """匹配分/评分主卡（Apple 风格，无饱和色警示）。"""
+    """匹配分/评分主卡（靛蓝白风格，无饱和色警示）。"""
     st.markdown(
         f'<div style="background:{BG_SURFACE};padding:{SP_5} {SP_6};'
         f'border-radius:{RADIUS_LG};text-align:center;'
