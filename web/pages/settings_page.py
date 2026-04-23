@@ -21,7 +21,7 @@ page_shell_header(
 # ══════════════════════════════════════════════════════════
 # 个人画像（首次使用的第一步，写入 data/user_profile.yaml）
 # ══════════════════════════════════════════════════════════
-apple_section_heading("个人画像", subtitle="这些信息会注入简历定制、邮件模板、面试准备的 prompt")
+apple_section_heading("个人画像", subtitle="这些信息会注入简历定制、岗位匹配和目标公司筛选")
 
 _profile = settings.user_profile or {}
 _user = _profile.get("user", {}) or {}
@@ -48,7 +48,7 @@ with st.form("user_profile_form"):
     p_highlights = st.text_area(
         "一句话核心亮点",
         value=_career.get("highlights", ""),
-        help="会注入到邮件/内推模板的 {highlights} 占位",
+        help="会注入到简历定制和岗位匹配的背景摘要。",
         height=80,
     )
 
@@ -75,8 +75,10 @@ with st.form("user_profile_form"):
             # 清缓存让 settings.user_profile 读到新值
             from config import get_settings
             get_settings.cache_clear()
+            record_action_status(st.session_state, "settings_profile_save", "success", "画像已保存")
             alert_success("个人画像已保存到 data/user_profile.yaml")
         except Exception as e:
+            record_action_status(st.session_state, "settings_profile_save", "error", f"保存失败：{e}")
             alert_danger(f"保存失败：{e}")
 
 if not settings.has_user_profile:
@@ -402,44 +404,6 @@ with export_col_docx_b:
         "settings_docx_template",
     )
 
-# ── SMTP 邮件配置 ─────────────────────────────────────────
-divider()
-apple_section_heading("邮件 SMTP 配置")
-
-with st.form("smtp_config"):
-    smtp_host = st.text_input("SMTP 服务器", value=current_env.get("SMTP_HOST", "smtp.gmail.com"))
-    smtp_port = st.text_input("SMTP 端口", value=current_env.get("SMTP_PORT", "587"))
-    smtp_user = st.text_input("SMTP 用户名（邮箱地址）", value=current_env.get("SMTP_USER", ""))
-    # 安全：SMTP 密码同样不预填真实值
-    _existing_smtp_pass = current_env.get("SMTP_PASSWORD", "")
-    if _existing_smtp_pass:
-        st.caption(f"当前密码：`{settings.masked_key(_existing_smtp_pass)}` · 留空保持不变，输入新密码覆盖")
-    smtp_pass = st.text_input(
-        "SMTP 密码 / 应用专用密码",
-        value="",
-        type="password",
-        placeholder="粘贴新密码或留空保持当前密码",
-    )
-
-    if st.form_submit_button("保存邮件配置"):
-        current_env["SMTP_HOST"] = smtp_host
-        current_env["SMTP_PORT"] = smtp_port
-        current_env["SMTP_USER"] = smtp_user
-        # 留空保留现有密码
-        current_env["SMTP_PASSWORD"] = smtp_pass.strip() if smtp_pass and smtp_pass.strip() else _existing_smtp_pass
-        _write_env(current_env)
-        alert_success("SMTP 配置已保存，重启应用后生效。")
-
-if settings.has_smtp:
-    st.markdown(
-        badge("已配置", "success") +
-        f' <span style="font-size:13px;color:#1d1d1f">{settings.smtp_user} → {settings.smtp_host}:{settings.smtp_port}</span>',
-        unsafe_allow_html=True,
-    )
-else:
-    st.markdown(badge("未配置", "muted"), unsafe_allow_html=True)
-    st.caption("配置后可直接从系统发送求职邮件。")
-
 # ══════════════════════════════════════════════════════════
 # 数据备份：导出所有数据到 JSON / 从 JSON 导入
 # 云端部署上这是唯一的数据持久化方式（Cloud FS 只读/重启丢数据）
@@ -532,13 +496,13 @@ if settings.demo_mode:
     paths_data = [
         ("数据库",    "云端临时数据库",
                       settings.db_full_path,
-                      "SQLite 单文件，存储所有岗位、简历、投递、面试、素材等"),
+                      "SQLite 单文件，存储岗位、简历、素材、设置等"),
         ("主简历",    "主简历数据表",
                       settings.master_resume_full_path,
                       "旧版 YAML 格式主简历（已被 DB 的 resume_master 表取代，可忽略）"),
         ("输出目录",  "云端临时输出目录",
                       settings.output_full_path,
-                      "生成的定制简历 PDF / 求职信 / 导出文件存放处"),
+                      "生成的定制简历 PDF / DOCX 和导出文件存放处"),
         ("项目根目录", "云端应用目录",
                       settings.project_root,
                       "Streamlit 应用代码所在目录"),
@@ -547,13 +511,13 @@ else:
     paths_data = [
         ("数据库",    str(settings.db_full_path.resolve()),
                       settings.db_full_path,
-                      "SQLite 单文件，存储所有岗位、简历、投递、面试、素材等"),
+                      "SQLite 单文件，存储岗位、简历、素材、设置等"),
         ("主简历",    str(settings.master_resume_full_path.resolve()),
                       settings.master_resume_full_path,
                       "旧版 YAML 格式主简历（已被 DB 的 resume_master 表取代，可忽略）"),
         ("输出目录",  str(settings.output_full_path.resolve()),
                       settings.output_full_path,
-                      "生成的定制简历 PDF / 求职信 / 导出文件存放处"),
+                      "生成的定制简历 PDF / DOCX 和导出文件存放处"),
         ("项目根目录", str(settings.project_root.resolve()),
                       settings.project_root,
                       "Streamlit 应用代码所在目录"),
@@ -701,6 +665,8 @@ with st.form("target_companies_form"):
             })
             from config import get_settings
             get_settings.cache_clear()
+            record_action_status(st.session_state, "settings_target_companies_save", "success", "目标公司清单已保存")
             alert_success("目标公司清单已保存。")
         except Exception as e:
+            record_action_status(st.session_state, "settings_target_companies_save", "error", f"保存失败：{e}")
             alert_danger(f"保存失败：{e}")
