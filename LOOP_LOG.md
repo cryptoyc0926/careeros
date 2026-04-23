@@ -23,7 +23,7 @@ N | TIMESTAMP | VERDICT | TASK | COMMIT_OR_ROLLBACK | SCREENSHOT
 ## 历史（最新在底部）
 
 ```
-1 | 2026-04-23 03:48 | PASS | sidebar View more/less 本地化为「查看更多/收起」| <待commit>  | inline
+1 | 2026-04-23 03:48 | PASS | sidebar View more/less 本地化为「查看更多/收起」| 47c8aa8 | inline
 ```
 
 ## 备注
