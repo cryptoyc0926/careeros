@@ -30,6 +30,7 @@ sys.path.insert(0, str(WEB))
 
 from services import resume_tailor  # noqa: E402
 from services import resume_renderer  # noqa: E402
+from services.resume_docx_template import build_template_docx  # noqa: E402
 from services.resume_validator import ValidationError  # noqa: E402
 
 
@@ -74,6 +75,17 @@ def _run_one(
             row["pdf_magic_ok"] = pdf_bytes.startswith(b"%PDF-")
         except Exception as exp:
             row["pdf_error"] = f"{type(exp).__name__}: {exp}"
+
+        # 导出 DOCX 模板
+        try:
+            docx_bytes = build_template_docx(result)
+            docx_path = out_dir / f"{label}.docx"
+            docx_path.write_bytes(docx_bytes)
+            row["docx_bytes"] = len(docx_bytes)
+            row["docx_path"] = str(docx_path)
+            row["docx_magic_ok"] = docx_bytes.startswith(b"PK\x03\x04")
+        except Exception as exp:
+            row["docx_error"] = f"{type(exp).__name__}: {exp}"
 
         row["ok"] = True
     except ValidationError as e:

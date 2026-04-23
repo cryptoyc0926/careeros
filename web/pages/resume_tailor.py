@@ -753,83 +753,9 @@ def _ensure_preview(force: bool = False) -> tuple[bytes | None, bytes | None, st
 
 
 def _build_template_docx(tdata: dict) -> bytes:
-    from docx import Document
-    import io as _io
-    import re as _re
+    from services.resume_docx_template import build_template_docx
 
-    doc = Document()
-    b = tdata.get("basics", {})
-    doc.add_heading(b.get("name") or "简历", level=0)
-    contact = " · ".join(
-        x for x in [b.get("phone"), b.get("email"), b.get("city"), b.get("target_role")] if x
-    )
-    if contact:
-        doc.add_paragraph(contact)
-
-    def _add_rich(p, text: str):
-        parts = _re.split(r"(<b>.*?</b>)", text or "", flags=_re.IGNORECASE | _re.DOTALL)
-        for part in parts:
-            if not part:
-                continue
-            m = _re.match(r"<b>(.*?)</b>", part, flags=_re.IGNORECASE | _re.DOTALL)
-            if m:
-                r = p.add_run(m.group(1))
-                r.bold = True
-            else:
-                p.add_run(_re.sub(r"<[^>]+>", "", part))
-
-    prof = tdata.get("profile")
-    if isinstance(prof, dict):
-        pool = prof.get("pool") or []
-        default_id = prof.get("default")
-        prof = next(
-            (x.get("text", "") for x in pool if x.get("id") == default_id),
-            (pool[0].get("text", "") if pool else ""),
-        )
-    if prof:
-        doc.add_heading("个人总结", level=1)
-        _add_rich(doc.add_paragraph(), prof)
-
-    for sec, title in (("projects", "项目经历"), ("internships", "实习经历")):
-        items = tdata.get(sec) or []
-        if not items:
-            continue
-        doc.add_heading(title, level=1)
-        for it in items:
-            head = f"{it.get('company','')} — {it.get('role','')} · {it.get('date','')}"
-            p = doc.add_paragraph()
-            r = p.add_run(head)
-            r.bold = True
-            for bu in (it.get("bullets") or []):
-                pb = doc.add_paragraph(style="List Bullet")
-                _add_rich(pb, bu)
-
-    skills = tdata.get("skills") or []
-    if skills:
-        doc.add_heading("技能证书", level=1)
-        for s in skills:
-            p = doc.add_paragraph()
-            r = p.add_run(f"{s.get('label','')}：")
-            r.bold = True
-            p.add_run(s.get("text", ""))
-
-    edu = tdata.get("education") or []
-    if edu:
-        doc.add_heading("教育背景", level=1)
-        for e in edu:
-            school = e.get("school") or e.get("company") or ""
-            major = e.get("major") or e.get("role") or ""
-            date = e.get("date", "")
-            p = doc.add_paragraph()
-            r = p.add_run(f"{school} · {major} · {date}")
-            r.bold = True
-            for bu in (e.get("bullets") or []):
-                pb = doc.add_paragraph(style="List Bullet")
-                _add_rich(pb, bu)
-
-    buf = _io.BytesIO()
-    doc.save(buf)
-    return buf.getvalue()
+    return build_template_docx(tdata)
 
 
 def _render_save_version() -> None:

@@ -25,6 +25,7 @@ sys.path.insert(0, str(ROOT))
 
 from services import resume_tailor  # noqa: E402
 from services import resume_renderer  # noqa: E402
+from services.resume_docx_template import build_template_docx  # noqa: E402
 
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -159,9 +160,8 @@ def test_tailor_matrix_success(monkeypatch, jd_key: str, resume_key: str) -> Non
 
     # ── 断言 2：canvas 数据实际变化（profile 被 JD 改写）──
     flat_master = _flatten(master)
-    assert result["profile"] != flat_master.get("profile"), (
-        f"profile 没有变化 · {resume_key} + {jd_key}"
-    )
+    assert result != flat_master, f"tailor_data 未变化 · {resume_key} + {jd_key}"
+    assert result["profile"] != flat_master.get("profile"), f"profile 没有变化 · {resume_key} + {jd_key}"
 
     # ── 断言 3：target_role 与 JD intent 对齐 ──
     target_role = result["basics"].get("target_role", "")
@@ -171,23 +171,19 @@ def test_tailor_matrix_success(monkeypatch, jd_key: str, resume_key: str) -> Non
     # 同步镜像：_meta.target_position 也要有
     assert result["_meta"].get("target_position") == jd_intent["target_role"]
 
-    # ── 断言 4：bullet / company / date 保留原样 ──
+    # ── 断言 4：导出 PDF / DOCX 都可生成，且体积与 magic 合规 ──
+    pdf_bytes = resume_renderer.render_pdf_bytes(result)
+    assert pdf_bytes.startswith(b"%PDF-"), f"{resume_key} + {jd_key}: PDF magic header 缺失"
+    assert len(pdf_bytes) > 50_000, f"{resume_key} + {jd_key}: PDF bytes too small ({len(pdf_bytes)})"
+
+    docx_bytes = build_template_docx(result)
+    assert docx_bytes.startswith(b"PK\x03\x04"), f"{resume_key} + {jd_key}: DOCX magic header 缺失"
+    assert len(docx_bytes) > 10_000, f"{resume_key} + {jd_key}: DOCX bytes too small ({len(docx_bytes)})"
+
+    # ── 断言 5：bullet / company / date 保留原样 ──
     for key in ("projects", "internships"):
         for idx, orig in enumerate(flat_master.get(key, [])):
             got = result[key][idx]
             assert got["company"] == orig["company"]
             assert got["date"] == orig["date"]
             assert got["bullets"] == orig["bullets"]
-
-
-@pytest.mark.parametrize("resume_key", list(RESUME_CASES.keys()))
-def test_render_pdf_on_master(resume_key: str) -> None:
-    """导出路径：master 原始数据直接进 renderer，bytes 含 PDF magic。"""
-    master = copy.deepcopy(RESUME_CASES[resume_key])
-    flat = _flatten(master)
-    try:
-        pdf_bytes = resume_renderer.render_pdf_bytes(flat)
-    except Exception as e:  # pragma: no cover
-        pytest.skip(f"PDF renderer unavailable: {e}")
-    assert pdf_bytes.startswith(b"%PDF-"), f"{resume_key}: PDF magic header 缺失"
-    assert len(pdf_bytes) > 2000, f"{resume_key}: PDF bytes too small ({len(pdf_bytes)})"
