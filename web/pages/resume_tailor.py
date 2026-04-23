@@ -40,6 +40,20 @@ DB_PATH = settings.db_full_path
 
 # Apple design system (tokens + canvas CSS + global reset)
 resume_canvas.render_canvas_css()
+st.markdown(
+    """
+    <style>
+    .main .block-container,
+    [data-testid="stAppViewBlockContainer"],
+    [data-testid="stMainBlockContainer"]{
+      max-width: none !important;
+      width: 100% !important;
+      padding: 1.5rem 2rem 3rem !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 if not settings.has_anthropic_key:
     alert_danger("Claude API Key 未配置，请前往 **设置** 页面。")
@@ -984,8 +998,8 @@ with _tb_right:
 st.markdown('<div style="height:8px;"></div>', unsafe_allow_html=True)
 
 
-# ── 布局：3 列（Image 1 1:1）——JD+Chat / Canvas / Mini+ATS ──
-col_jd, col_canvas, col_ats = st.columns([0.24, 0.44, 0.32], gap="small")
+# ── 布局：3 列（Image 2 1:2:1）——JD+Chat / Canvas / Mini+ATS ──
+col_jd, col_canvas, col_ats = st.columns([0.25, 0.5, 0.25], gap="medium")
 
 # ═══ 第 2 列：JD 输入 + AI 对话 + 历史版本 ═══
 with col_jd:
@@ -994,7 +1008,7 @@ with col_jd:
     jd_text = st.text_area(
         "JD 原文",
         value=st.session_state.tailor_jd,
-        height=220,
+        height=180,
         placeholder="粘贴 JD 全文...",
         key="jd_textarea",
     )
