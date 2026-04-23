@@ -382,7 +382,7 @@ export_col_pdf, export_col_docx_a, export_col_docx_b = st.columns(3, gap="small"
 with export_col_pdf:
     _render_export_browser(
         "导出 PDF 原稿",
-        "已生成的 PDF 简历文件",
+        "已生成的 PDF 文件",
         pdf_files,
         "application/pdf",
         "settings_pdf_original",
