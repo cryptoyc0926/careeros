@@ -643,6 +643,34 @@ footer { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
+# ── Sidebar 导航文案本地化：Streamlit 内置的 View more / View less ───
+# st.markdown 会剥离 <script>，必须用 components.v1.html 在 iframe 内执行
+# JS，再经 window.parent.document 挂 MutationObserver。flag 挡重复 rerun。
+from streamlit.components.v1 import html as _careeros_html_inject  # noqa: E402
+
+_careeros_html_inject(
+    """
+<script>
+(function(){
+  var doc = (window.parent && window.parent.document) || document;
+  if (doc.__careerosSidebarLocalized) return;
+  doc.__careerosSidebarLocalized = true;
+  function localize(){
+    var b = doc.querySelector('[data-testid="stSidebarNavViewButton"]');
+    if (!b) return;
+    var t = (b.textContent || '').trim();
+    if (t === 'View more') b.textContent = '\u67e5\u770b\u66f4\u591a \u25be';
+    else if (t === 'View less') b.textContent = '\u6536\u8d77 \u25b4';
+  }
+  localize();
+  var mo = new MutationObserver(localize);
+  mo.observe(doc.body, {childList:true, subtree:true, characterData:true});
+})();
+</script>
+    """,
+    height=0,
+)
+
 # ── 每次启动都跑 init_db 补齐缺失的表（幂等 · IF NOT EXISTS）───
 # 说明：init_db 用 CREATE TABLE IF NOT EXISTS，对已有表无副作用。
 # 这样 schema 升级后老用户的 db 也能自动补新表（例如 jobs_pool 等核心业务表）。
