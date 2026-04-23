@@ -1,0 +1,74 @@
+{
+  "basics": {
+    "name": "杨超",
+    "phone": "186-8795-0926",
+    "email": "bc1chao0926@gmail.com",
+    "city": "杭州",
+    "target_role": "AI 增长运营",
+    "availability": "下周到岗"
+  },
+  "profile": {
+    "pool": [
+      {
+        "id": "default",
+        "tags": ["AI", "增长", "运营"],
+        "text": "统计科班出身，擅长把数据变成增长动作。曾从 0 搭建 AI Trading 社区，实现 <b>9,000+</b> 粉丝与 <b>1,300+</b> Telegram 订阅，完成 <b>20+</b> 次商业合作；3 段运营实习覆盖增长、内容与数据分析。"
+      }
+    ],
+    "default": "default"
+  },
+  "projects": [
+    {
+      "company": "X @Cady_btc",
+      "role": "独立运营 · AI 方向内容账号",
+      "date": "2024.03 - 至今",
+      "bullets": [
+        "从 0 搭建 X 与 Telegram 内容矩阵，在零投放预算下增长至 <b>9,000+</b> 粉丝与 <b>1,300+</b> 订阅。",
+        "设计热点监测、信号筛选、结构化分析与分发输出流程，稳定支撑每日 <b>15+</b> 条内容产出。",
+        "围绕用户关注点做内容测试与社群运营，沉淀可复用的 AI 内容生产 SOP。"
+      ]
+    },
+    {
+      "company": "CareerOS",
+      "role": "产品与自动化实践",
+      "date": "2025.10 - 至今",
+      "bullets": [
+        "搭建岗位池、JD 解析、简历定制、面试准备工作流，覆盖求职全链路。",
+        "用 SQLite 管理岗位与投递数据，结合大模型完成 JD 匹配、简历改写与评估。"
+      ]
+    }
+  ],
+  "internships": [
+    {
+      "company": "Fancy Tech",
+      "role": "海外产品运营实习生",
+      "date": "2024.06 - 2024.09",
+      "bullets": [
+        "负责 AI 内容生产与分发，搭建 TikTok + Instagram 内容矩阵，应用 AI 工具批量生成选题与文案，优化发布策略，带动账号粉丝增长 <b>200+</b>，单条爆款内容播放量提升 <b>5 倍</b>。",
+        "拆解 PhotoRoom、Pebblely 等竞品链路，提炼高转化场景并输出产品优化建议。",
+        "在 Reddit、TikTok 垂直社群做英文私信触达与内容冷启动，验证产品 PMF 假设。"
+      ]
+    },
+    {
+      "company": "杭银消费金融股份有限公司",
+      "role": "数据运营实习生",
+      "date": "2023.06 - 2023.10",
+      "bullets": [
+        "参与用户分层、活动复盘与指标看板维护，支持运营策略迭代。",
+        "整理业务数据与活动结果，输出周报和专项分析材料。"
+      ]
+    }
+  ],
+  "skills": [
+    {"label": "AI 工具与内容生产", "text": "Claude Code · Kimi · ChatGPT · Cursor · Notion AI · Prompt 工程"},
+    {"label": "数据与开发", "text": "Python · SQL · Excel · A/B 测试 · Streamlit · Git · SQLite"},
+    {"label": "语言能力", "text": "英语 CET-6（可独立撰写英文内容）"}
+  ],
+  "education": [
+    {
+      "school": "浙江工商大学",
+      "major": "应用统计学 · 本科",
+      "date": "2022.09 - 2026.07"
+    }
+  ]
+}
