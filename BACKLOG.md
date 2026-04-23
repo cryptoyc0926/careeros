@@ -15,9 +15,9 @@
     - [x] **P0 真死链修复**（ralph/5）：home.py 的 jd_input / jd_browser / analytics 3 张卡片 + hero "看数据分析" CTA 全部指向未在 st.navigation 注册的页面，触发 Streamlit "Page not found"。把 3 页加到 `"求职工具"` 分组，sidebar 现 13 项 nav，3 页全可访问
     - [x] 剩余 5 页巡检完成（ralph/6）：resume_templates / help_feedback / case_library 是 "重构中" 预期占位；settings_page（BYO-Key 完整）+ star_pool（STAR 素材池 10 素材）均正常
     - [x] Sidebar 折叠按钮"查看更多"禁用（ralph/6）：13 项 nav 原被 `max-height:270px; overflow:hidden` 折叠，CSS 强制 `max-height:none` + 隐藏 `stSidebarNavViewButton`，13 项一屏全展开
-- [ ] **JD 输入 → 简历生成 → 仪表盘**端到端跑通一次，用 `memory/` 里已归档的蔚来 NIO 杭州校招 JD 做样本，任何一步断流的定位修复
-- [ ] 简历定制页的 canvas P0 三条（pill chip / 宽度 / MD 源码透穿）如仍未收口，优先修
-- [ ] AI 定制结果被硬规则拒绝的误判（若仍复现）
+- [ ] **JD 输入 → 简历生成 → 仪表盘**端到端跑通一次，用 `memory/` 里已归档的蔚来 NIO 杭州校招 JD 做样本，任何一步断流的定位修复（⚠ Codex 在 resume_tailor 活跃写入期间暂缓）
+- [~] 简历定制页的 canvas P0 三条（pill chip / 宽度 / MD 源码透穿）— Codex RT-05/RT-06 正在重构 3-col 1:2:1 布局 + friendly error formatter，等 Codex 定型后再巡
+- [ ] AI 定制结果被硬规则拒绝的误判（若仍复现）— 同上 Codex 期间暂缓
 
 ## P0 · 简历生成（核心模块）
 
@@ -34,14 +34,14 @@
 
 ## P1 · UI 打磨（Apple 风克制 + 一点灵气）
 
-- [ ] app.py 蓝框黑字按钮 → 靛蓝白按钮（L159-160 附近的硬编码）
-- [ ] 数据图/指标卡的黑色 border → `BORDER_COLOR` token
-- [ ] 表格黑色 border → 同上
-- [ ] Sidebar 灰色字对比度过低 → `TEXT_SECONDARY`
-- [ ] 首页 hero 下方冗余 block（preview 后具体定位）
-- [ ] app.py 21 个 CSS hunk（Apple gray → 靛蓝白）分批提交，每轮 3-5 个 hunk
-- [ ] 设置页 BYO-Key 区块的 focus ring 对齐 Apple 标准
-- [ ] 所有 st.alert 再扫一遍（Round2 已统一 ~93 处，可能有漏）
+- [x] ~~app.py 蓝框黑字按钮~~ 已是正确状态 kind=secondary 白底深字（ralph/1 巡检排除）
+- [x] ~~数据图/指标卡的黑色 border~~ analytics 页已 Apple style 无黑框（ralph/7 巡检排除）
+- [x] ~~表格黑色 border~~ jd_browser 表格已是 Apple style 无黑框（ralph/8 巡检排除）
+- [x] ~~Sidebar 灰色字 → TEXT_SECONDARY~~ obsolete — `TEXT_SECONDARY` token 不存在，现用 `TEXT_MUTED = #6B7280` 是 Apple 官方 neutral gray（ralph/8 排除）
+- [x] ~~首页 hero 下方冗余 block~~ 实测 blocksBetween=[]，88px gap = SP_5 (24) + SP_7 (48) + CTA padding，非冗余，属设计间距（ralph/8 排除）
+- [x] ~~所有 st.alert 扫一遍~~ 已做 — web/ 里只剩 app.py L694 init_db 失败的 st.warning，那里用原生样式刻意突出系统错误（ralph/7 结论）
+- [ ] app.py 21 个 CSS hunk（Apple gray → 靛蓝白）分批提交 — 原计划来源已过时，下轮用 preview 实测哪些色块仍不一致再挑具体的修
+- [ ] 设置页 BYO-Key 区块的 focus ring 对齐 Apple 标准 — 需 preview_inspect focused 态，延后
 
 ## P2 · 测试覆盖
 
