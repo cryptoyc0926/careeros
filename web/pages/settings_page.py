@@ -194,6 +194,45 @@ def _current_api_key() -> str:
 def _provider_has_key(provider_key: str) -> bool:
     return bool(_current_api_key() or (provider_key == "codex" and settings.codex_shared_key))
 
+
+def _list_export_files(suffixes: tuple[str, ...], *, limit: int = 20) -> list[Path]:
+    """Return generated export files from the configured output directory."""
+    output_dir = Path(settings.output_full_path) if settings.output_full_path else Path("output")
+    if not output_dir.exists():
+        return []
+    suffix_set = {suffix.lower() for suffix in suffixes}
+    files = [path for path in output_dir.rglob("*") if path.is_file() and path.suffix.lower() in suffix_set]
+    return sorted(files, key=lambda path: path.stat().st_mtime, reverse=True)[:limit]
+
+
+def _render_export_browser(title: str, subtitle: str, files: list[Path], mime: str, key_prefix: str) -> None:
+    st.markdown(f"**{title}**")
+    st.caption(subtitle)
+    if not files:
+        st.caption("暂无已生成文件。请先在在线定制页生成并导出。")
+        return
+
+    from datetime import datetime as _dt
+
+    for idx, file_path in enumerate(files):
+        stat = file_path.stat()
+        modified = _dt.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M")
+        size_kb = max(1, stat.st_size // 1024)
+        c1, c2, c3 = st.columns([4, 2, 1.4], gap="small")
+        with c1:
+            st.markdown(f"`{file_path.name}`")
+        with c2:
+            st.caption(f"{modified} · {size_kb:,} KB")
+        with c3:
+            st.download_button(
+                "下载",
+                data=file_path.read_bytes(),
+                file_name=file_path.name,
+                mime=mime,
+                use_container_width=True,
+                key=f"{key_prefix}_{idx}_{file_path.name}",
+            )
+
 # 云端 BYO-Key 提示
 if settings.demo_mode:
     alert_info(
@@ -327,6 +366,41 @@ with col_test:
     _provider_ping_caption = format_action_status_caption(st.session_state, "provider_ping")
     if _provider_ping_caption:
         st.caption(_provider_ping_caption)
+
+# ── 导出文件浏览（只读，不生成新文件）──────────────────────────
+divider()
+apple_section_heading(
+    "导出文件浏览",
+    subtitle="只读查看已生成的简历文件；生成逻辑仍由在线定制页和既有导出服务负责。",
+)
+
+pdf_files = _list_export_files((".pdf",))
+docx_files = _list_export_files((".docx",))
+export_col_pdf, export_col_docx_a, export_col_docx_b = st.columns(3, gap="small")
+with export_col_pdf:
+    _render_export_browser(
+        "导出 PDF 原稿",
+        "已生成的 PDF 简历文件",
+        pdf_files,
+        "application/pdf",
+        "settings_pdf_original",
+    )
+with export_col_docx_a:
+    _render_export_browser(
+        "导出 DOCX 原稿改写",
+        "基于上传原稿回写的 DOCX 文件",
+        docx_files,
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "settings_docx_rewrite",
+    )
+with export_col_docx_b:
+    _render_export_browser(
+        "导出 DOCX 模板版",
+        "模板生成的 DOCX 文件",
+        docx_files,
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "settings_docx_template",
+    )
 
 # ── SMTP 邮件配置 ─────────────────────────────────────────
 divider()
