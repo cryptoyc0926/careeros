@@ -8,7 +8,11 @@
 
 ## P0 · Bugs & 断链（优先修，阻塞 owner 主流程）
 
-- [ ] **全站按钮/链接巡检**：用 preview_click 依次点 landing → 简历定制 → 仪表盘 → 设置页的主要按钮，console 有 error 或跳错页面的全部记下来
+- [~] **全站按钮/链接巡检**（ralph/1–4 进行中）：已巡 landing / home / resume_tailor / history_versions / master_resume / job_pool 6 页，全部无 console error / Streamlit exception。发现并修的问题：
+    - [x] sidebar View more/less 英文（ralph/1）
+    - [x] home 卡片 anchor 丢 path（ralph/2 部分修复 `?app=1`；完整修 ralph/5+ 改 st.page_link）
+    - [x] 顶部 Streamlit Deploy 按钮隐藏（ralph/4）
+    - [ ] 待巡：resume_templates / settings_page / help_feedback / star_pool / case_library / analytics / jd_input / jd_browser
 - [ ] **JD 输入 → 简历生成 → 仪表盘**端到端跑通一次，用 `memory/` 里已归档的蔚来 NIO 杭州校招 JD 做样本，任何一步断流的定位修复
 - [ ] 简历定制页的 canvas P0 三条（pill chip / 宽度 / MD 源码透穿）如仍未收口，优先修
 - [ ] AI 定制结果被硬规则拒绝的误判（若仍复现）

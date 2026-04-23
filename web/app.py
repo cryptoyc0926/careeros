@@ -635,6 +635,9 @@ hr { border-color: rgba(11,18,32,0.06) !important; margin: 24px 0 !important; }
 [data-testid="stStatusWidget"] { color: #6B7280 !important; }
 footer { display: none !important; }
 
+/* ═══ 19b. 顶部 Deploy 按钮（自用工具无需 Streamlit 公网部署入口）═════ */
+[data-testid="stDeployButton"] { display: none !important; }
+
 /* ═══ 20. 数字 tabular 字形（stat 卡专用）═══════════════════ */
 .cos-num {
     font-variant-numeric: tabular-nums;
