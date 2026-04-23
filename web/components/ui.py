@@ -288,8 +288,10 @@ def task_action_card(title: str, description: str, page: str) -> None:
 
     注意：<a> 内嵌 <div> 会被 Markdown parser 切成独立 block，
     必须用 <span style="display:block"> 保持 inline token 连续。
+    route 带 ?app=1 是因为整页 <a> 导航会开新 Streamlit session，
+    需要 app.py 的 query_params 分支把 entered_app 置 True 跳过 landing。
     """
-    route = "/" + page.replace("pages/", "").replace(".py", "")
+    route = "/" + page.replace("pages/", "").replace(".py", "") + "?app=1"
     st.markdown(
         f'<a href="{route}" target="_self" class="apple-action-card" '
         f'style="text-decoration:none;'
@@ -313,8 +315,9 @@ def feature_card(title: str, description: str, page: str) -> None:
     """常用入口卡。title + 一句描述 + 右下角 '进入 →'。
 
     同 task_action_card：<a> 内部用 <span display:block>，避免块级标签被 parser 切开。
+    route 带 ?app=1 见 task_action_card 的说明。
     """
-    route = "/" + page.replace("pages/", "").replace(".py", "")
+    route = "/" + page.replace("pages/", "").replace(".py", "") + "?app=1"
     st.markdown(
         f'<a href="{route}" target="_self" class="apple-feature-card" '
         f'style="text-decoration:none;'

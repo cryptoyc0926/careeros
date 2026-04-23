@@ -49,7 +49,11 @@
 ## Discovered（运行中 Ralph append）
 
 - [x] Sidebar "View more / View less" 本地化为 "查看更多 / 收起"（ralph/1）
-- [ ] 主仪表盘"接下来做什么"3 个卡片（处理 P0 岗位 / 更新主简历 / 定制目标简历）的"开始 →"链接未验证是否能正常跳转
+- [x] ~~Landing 免费体验按钮 click 不切 session~~ 误报 — click 生效但 Streamlit rerun 有延迟，上轮截图太快（ralph/2 排除）
+- [~] 主仪表盘"接下来做什么"3 个卡片 + "常用入口"3 个卡片整页 `<a href>` 导航（ralph/2 部分修复）：
+    - **已完成**：route 追加 `?app=1` 让整页刷新后不 fallback 到 landing
+    - **未完成**：Streamlit frontend 拦截 anchor click 把 path 丢掉，结果是 URL 变 `/?app=1` 只到根 home 而不到目标 page
+    - **根因**：`a.click()` 连 document capture-phase click event 都不触发，Streamlit 可能 monkey-patch 了 anchor click 走 SPA nav
+    - **下轮方案 P0**：把 `task_action_card` / `feature_card` 从 `<a>` 改成 `st.page_link`（Streamlit 原生 SPA nav，稳）+ 外层 CSS 保持卡片样式
 - [ ] 主仪表盘"今天的进度"第 1 张卡（岗位待处理 99）字号/布局与右侧 3 张 stat 卡（45 / 1 / 0/0）不一致，视觉割裂
-- [ ] Landing 免费体验按钮（kind=primary）click 后 session 没切换到 entered_app，只有 `?app=1` URL param 才生效——候选 bug，需复现确认
 - [ ] L686-695 那段 `st.markdown("<script>...")` 的 scroll reset 脚本因 Streamlit 剥离 `<script>` 而静默失效，需同迁到 components.v1.html
