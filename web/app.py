@@ -709,17 +709,25 @@ if not st.session_state["entered_app"]:
         st.stop()
 
 # ── 从 Landing 进主应用时：scrollTop=0 避免继承 Landing 的滚动位置 ─
+# st.markdown 会剥离 <script>，走 components.v1.html 的 iframe 才能真执行。
+# Streamlit 1.38+ 把 scrollable main 从 stMain 改成 section.main，多选器兜底。
 if st.session_state.get("_pending_scroll_top"):
     st.session_state["_pending_scroll_top"] = False
-    st.markdown(
-        "<script>"
-        "setTimeout(function(){"
-        "var m=parent.document.querySelector('[data-testid=\"stMain\"]');"
-        "if(m){m.scrollTop=0;}"
-        "window.scrollTo(0,0);"
-        "},80);"
-        "</script>",
-        unsafe_allow_html=True,
+    _careeros_html_inject(
+        """
+<script>
+setTimeout(function(){
+  var doc = (window.parent && window.parent.document) || document;
+  var win = (window.parent && window.parent.window) || window;
+  var m = doc.querySelector('[data-testid="stMain"]')
+       || doc.querySelector('section.main')
+       || doc.querySelector('[data-testid="stAppViewContainer"]');
+  if (m) m.scrollTop = 0;
+  win.scrollTo(0, 0);
+}, 80);
+</script>
+        """,
+        height=0,
     )
 
 # ── DEMO_MODE 全局提示条 ────────────────────────────────

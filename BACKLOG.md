@@ -56,4 +56,5 @@
     - **根因**：`a.click()` 连 document capture-phase click event 都不触发，Streamlit 可能 monkey-patch 了 anchor click 走 SPA nav
     - **下轮方案 P0**：把 `task_action_card` / `feature_card` 从 `<a>` 改成 `st.page_link`（Streamlit 原生 SPA nav，稳）+ 外层 CSS 保持卡片样式
 - [ ] 主仪表盘"今天的进度"第 1 张卡（岗位待处理 99）字号/布局与右侧 3 张 stat 卡（45 / 1 / 0/0）不一致，视觉割裂
-- [ ] L686-695 那段 `st.markdown("<script>...")` 的 scroll reset 脚本因 Streamlit 剥离 `<script>` 而静默失效，需同迁到 components.v1.html
+- [x] L686-695 那段 `st.markdown("<script>...")` scroll reset 脚本迁到 components.v1.html（ralph/3）
+      额外发现：原 selector `[data-testid="stMain"]` 在 Streamlit 1.38+ 已不存在，用 `section.main` + 兜底多选器
