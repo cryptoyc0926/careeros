@@ -13,7 +13,8 @@
     - [x] home 卡片 anchor 丢 path（ralph/2 部分修复 `?app=1`；完整修 ralph/5+ 改 st.page_link）
     - [x] 顶部 Streamlit Deploy 按钮隐藏（ralph/4）
     - [x] **P0 真死链修复**（ralph/5）：home.py 的 jd_input / jd_browser / analytics 3 张卡片 + hero "看数据分析" CTA 全部指向未在 st.navigation 注册的页面，触发 Streamlit "Page not found"。把 3 页加到 `"求职工具"` 分组，sidebar 现 13 项 nav，3 页全可访问
-    - [ ] 待巡：resume_templates / settings_page / help_feedback / star_pool / case_library
+    - [x] 剩余 5 页巡检完成（ralph/6）：resume_templates / help_feedback / case_library 是 "重构中" 预期占位；settings_page（BYO-Key 完整）+ star_pool（STAR 素材池 10 素材）均正常
+    - [x] Sidebar 折叠按钮"查看更多"禁用（ralph/6）：13 项 nav 原被 `max-height:270px; overflow:hidden` 折叠，CSS 强制 `max-height:none` + 隐藏 `stSidebarNavViewButton`，13 项一屏全展开
 - [ ] **JD 输入 → 简历生成 → 仪表盘**端到端跑通一次，用 `memory/` 里已归档的蔚来 NIO 杭州校招 JD 做样本，任何一步断流的定位修复
 - [ ] 简历定制页的 canvas P0 三条（pill chip / 宽度 / MD 源码透穿）如仍未收口，优先修
 - [ ] AI 定制结果被硬规则拒绝的误判（若仍复现）

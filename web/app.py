@@ -638,6 +638,13 @@ footer { display: none !important; }
 /* ═══ 19b. 顶部 Deploy 按钮（自用工具无需 Streamlit 公网部署入口）═════ */
 [data-testid="stDeployButton"] { display: none !important; }
 
+/* ═══ 19c. Sidebar Nav 全展开（13 项一屏够放，免点「查看更多」）════ */
+[data-testid="stSidebarNavItems"] {
+    max-height: none !important;
+    overflow: visible !important;
+}
+[data-testid="stSidebarNavViewButton"] { display: none !important; }
+
 /* ═══ 20. 数字 tabular 字形（stat 卡专用）═══════════════════ */
 .cos-num {
     font-variant-numeric: tabular-nums;
