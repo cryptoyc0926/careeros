@@ -85,3 +85,34 @@ def test_tailor_succeeds_when_only_formatting_warnings_exist(monkeypatch):
     assert tailored["profile"].startswith("针对 JD")
     assert tailored["_meta"]["validation"]["warnings"]
     assert tailored["_meta"]["match_score"] == 80
+
+
+def test_tailor_sets_target_role_from_jd_intent_when_model_omits_it(monkeypatch):
+    result = {
+        "basics": {},
+        "profile": "针对 JD 的新总结，保留 10000+ 曝光经验。",
+        "projects": [],
+        "internships": [
+            {
+                "company": "Fancy Tech",
+                "role": "海外产品运营实习生",
+                "date": "2024.06 - 2024.09",
+                "bullets": ["做到 10000+ 曝光"],
+            }
+        ],
+        "skills": [],
+        "match_score": 82,
+        "change_notes": "测试",
+    }
+
+    monkeypatch.setattr(
+        resume_tailor,
+        "extract_jd_intent",
+        lambda jd: {"target_role": "海外增长运营", "top_keywords": []},
+    )
+    monkeypatch.setattr(resume_tailor, "_call_claude", lambda **kwargs: json.dumps(result, ensure_ascii=False))
+
+    tailored = resume_tailor.tailor_resume(MASTER, "JD")
+
+    assert tailored["basics"]["target_role"] == "海外增长运营"
+    assert tailored["_meta"]["target_position"] == "海外增长运营"

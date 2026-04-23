@@ -362,6 +362,78 @@ def _clear_canvas_error() -> None:
     st.session_state.pop("_tailor_canvas_error", None)
 
 
+def _clear_tailor_validation_state() -> None:
+    for key in (
+        "tailor_validation_error",
+        "tailor_validation_draft",
+        "tailor_validation_raw",
+        "tailor_validation_previous",
+        "tailor_validation_previous_meta",
+    ):
+        st.session_state.pop(key, None)
+
+
+def _friendly_tailor_error(exc: Exception) -> str:
+    raw = str(exc)
+    raw_lower = raw.lower()
+    if isinstance(exc, json.JSONDecodeError) or "json 解析失败" in raw_lower or "json解析失败" in raw_lower:
+        return "AI 返回格式异常，请稍后重试"
+    if isinstance(exc, TimeoutError) or "timeout" in raw_lower or "timed out" in raw_lower or "超时" in raw:
+        return "AI 服务响应超时，请稍后重试"
+    if isinstance(exc, AIError):
+        return "AI 服务暂不可用，请稍后重试"
+    return "生成失败，请稍后重试"
+
+
+def _normalize_tailor_target_role(data: dict, meta: dict | None = None) -> None:
+    meta = meta or {}
+    basics = data.setdefault("basics", {})
+    master_basics = master.get("basics") or {}
+    current_role = (basics.get("target_role") or basics.get("target_position") or "").strip()
+    master_role = (master_basics.get("target_role") or master_basics.get("target_position") or "").strip()
+    jd_intent = meta.get("jd_intent") if isinstance(meta.get("jd_intent"), dict) else {}
+    inferred_role = (
+        meta.get("target_position")
+        or meta.get("target_role")
+        or jd_intent.get("target_position")
+        or jd_intent.get("target_role")
+    )
+    inferred_role = str(inferred_role).strip() if inferred_role else ""
+    if inferred_role and (not current_role or current_role == master_role):
+        basics["target_role"] = inferred_role
+    elif current_role:
+        basics["target_role"] = current_role
+    if basics.get("target_role") and not meta.get("target_position"):
+        meta["target_position"] = basics["target_role"]
+
+
+def _apply_validation_draft(error, jd_text: str) -> dict | None:
+    report = error.report.as_dict()
+    st.session_state.tailor_validation_error = report
+    st.session_state.tailor_validation_raw = error.raw
+    st.session_state.tailor_jd = jd_text
+    if not error.draft:
+        st.session_state.tailor_validation_draft = None
+        return None
+
+    draft = _copy_tailor.deepcopy(error.draft)
+    meta = draft.pop("_meta", {}) or {}
+    meta["validation"] = report
+    meta["validation_blocked"] = True
+    meta["change_notes"] = meta.get("change_notes") or "草稿已渲染未保存"
+    _normalize_tailor_target_role(draft, meta)
+
+    st.session_state.tailor_validation_previous = _copy_tailor.deepcopy(st.session_state.tailor_data)
+    st.session_state.tailor_validation_previous_meta = _copy_tailor.deepcopy(st.session_state.tailor_meta)
+    _push_undo_snapshot(label="校验失败前版本")
+    st.session_state.tailor_data = draft
+    st.session_state.tailor_meta = meta
+    st.session_state.tailor_validation_draft = _copy_tailor.deepcopy(draft)
+    _clear_tailor_preview_cache()
+    _clear_canvas_error()
+    return draft
+
+
 def _format_patch_errors(errors: list[str]) -> str:
     return "Patch 应用失败：\n" + "\n".join(f"- {e}" for e in errors)
 
@@ -767,6 +839,11 @@ def _render_save_version() -> None:
             record_action_status(st.session_state, "resume_tailor_save_version", "error", "版本名为空，未保存")
             alert_warning("请输入版本名")
             return
+        if st.session_state.get("tailor_validation_error"):
+            content = "当前草稿含硬规则问题，请先选择「忽略保存」或「回退旧版」"
+            record_action_status(st.session_state, "resume_tailor_save_version", "error", content)
+            alert_warning(content)
+            return
         try:
             conn = sqlite3.connect(DB_PATH)
             if _has_db_column("resume_versions", "chat_transcript_json"):
@@ -839,6 +916,7 @@ def _render_history_versions() -> None:
             _restore_chat_transcript(row["chat_transcript_json"] if has_chat_col else None)
             st.session_state.tailor_undo_stack = []
             st.session_state.tailor_meta = {}
+            _clear_tailor_validation_state()
             _clear_tailor_preview_cache()
             st.rerun()
 
@@ -1024,6 +1102,7 @@ with col_jd:
         st.session_state.tailor_data = flatten_master_for_render(master)
         st.session_state.tailor_meta = {}
         st.session_state.tailor_jd = ""
+        _clear_tailor_validation_state()
         record_action_status(st.session_state, "resume_tailor_generate", "success", "已重置为主简历")
         st.rerun()
 
@@ -1035,11 +1114,10 @@ with col_jd:
         record_action_status(st.session_state, "resume_tailor_generate", "running", "正在生成定制版")
         with st.spinner("正在分析 JD 并重写简历..."):
             try:
-                st.session_state.pop("tailor_validation_error", None)
-                st.session_state.pop("tailor_validation_draft", None)
-                st.session_state.pop("tailor_validation_raw", None)
+                _clear_tailor_validation_state()
                 tailored = resume_tailor.tailor_resume(master, jd_text)
                 meta = tailored.pop("_meta", {})
+                _normalize_tailor_target_role(tailored, meta)
                 _push_undo_snapshot(label="JD 定制重写")
                 st.session_state.tailor_data = tailored
                 st.session_state.tailor_meta = meta
@@ -1065,24 +1143,30 @@ with col_jd:
                     )
                 st.rerun()
             except AIError as e:
-                record_action_status(st.session_state, "resume_tailor_generate", "error", f"AI 调用失败：{e}")
-                alert_danger(f"AI 调用失败：{e}")
+                content = _friendly_tailor_error(e)
+                record_action_status(st.session_state, "resume_tailor_generate", "error", content)
+                alert_danger(content)
             except Exception as e:
                 # T6 ValidationError 走这里，渲染红色 banner + diff
                 from services.resume_validator import ValidationError, format_validation_issue_markdown
                 if isinstance(e, ValidationError):
-                    st.session_state.tailor_validation_error = e.report.as_dict()
-                    st.session_state.tailor_validation_draft = e.draft
-                    st.session_state.tailor_validation_raw = e.raw
+                    draft = _apply_validation_draft(e, jd_text)
+                    hard_count = len(e.report.hard_errors)
+                    status_text = (
+                        f"{hard_count} 条硬规则未通过 · 草稿已渲染未保存"
+                        if draft else
+                        f"{hard_count} 条硬规则未通过 · 未生成草稿"
+                    )
                     record_action_status(
                         st.session_state,
                         "resume_tailor_generate",
                         "validation_error",
-                        f"硬规则校验失败：{len(e.report.hard_errors)} 条硬错 · 未写入定制版",
+                        status_text,
                     )
-                    alert_danger(f"硬规则校验失败：{len(e.report.hard_errors)} 条硬错 · 未写入定制版")
-                    if e.draft:
-                        alert_warning("AI 已返回草稿，但存在硬规则问题。右侧仍显示当前简历，草稿暂不自动覆盖。")
+                    if draft:
+                        alert_warning(f"⚠ {status_text}")
+                    else:
+                        alert_danger(status_text)
                     with st.expander("查看违规明细", expanded=True):
                         for err in e.report.hard_errors:
                             st.markdown(format_validation_issue_markdown(err))
@@ -1092,8 +1176,9 @@ with col_jd:
                             for w in e.report.warnings:
                                 st.caption(format_validation_issue_markdown(w))
                 else:
-                    record_action_status(st.session_state, "resume_tailor_generate", "error", f"失败：{e}")
-                    alert_danger(f"失败：{e}")
+                    content = _friendly_tailor_error(e)
+                    record_action_status(st.session_state, "resume_tailor_generate", "error", content)
+                    alert_danger(content)
     _generate_caption = format_action_status_caption(st.session_state, "resume_tailor_generate")
     if _generate_caption:
         st.caption(_generate_caption)
@@ -1491,9 +1576,43 @@ def _render_resume_canvas_editor() -> None:
     validation_draft = st.session_state.get("tailor_validation_draft")
 
     if validation_error:
-        alert_warning("上次 JD 定制没有写入当前画布。当前右侧显示的是现有简历，不是失败那次的 AI 草稿。")
+        hard_count = len(validation_error.get("hard_errors") or [])
+        alert_warning(f"⚠ {hard_count} 条硬规则未通过 · 草稿已渲染未保存")
+        action_col, rollback_col = st.columns(2)
+        with action_col:
+            if st.button("忽略保存", key="tailor_validation_ignore", type="primary", use_container_width=True):
+                _clear_tailor_validation_state()
+                st.session_state.tailor_meta["validation_ignored"] = True
+                st.session_state.tailor_meta["validation_blocked"] = False
+                record_action_status(
+                    st.session_state,
+                    "resume_tailor_generate",
+                    "success",
+                    "已忽略硬规则，当前草稿可继续保存",
+                )
+                st.rerun()
+        with rollback_col:
+            if st.button("回退旧版", key="tailor_validation_rollback", use_container_width=True):
+                previous = st.session_state.get("tailor_validation_previous")
+                previous_meta = st.session_state.get("tailor_validation_previous_meta")
+                if previous:
+                    st.session_state.tailor_data = _copy_tailor.deepcopy(previous)
+                if previous_meta is not None:
+                    st.session_state.tailor_meta = _copy_tailor.deepcopy(previous_meta)
+                else:
+                    st.session_state.tailor_meta = {}
+                _clear_tailor_validation_state()
+                _clear_tailor_preview_cache()
+                _clear_canvas_error()
+                record_action_status(
+                    st.session_state,
+                    "resume_tailor_generate",
+                    "success",
+                    "已回退到校验失败前版本",
+                )
+                st.rerun()
         if validation_draft:
-            with st.expander("查看 AI 草稿 JSON（未自动应用）", expanded=False):
+            with st.expander("查看 AI 草稿 JSON", expanded=False):
                 st.json(validation_draft)
 
     if meta:

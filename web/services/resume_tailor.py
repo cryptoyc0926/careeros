@@ -242,16 +242,34 @@ def _flatten_master(master: dict) -> dict:
     return flat
 
 
+def _first_non_empty_text(*values: Any) -> str:
+    for value in values:
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return ""
+
+
 def _merge_tailored(flat_master: dict, tailored: dict, jd_intent: dict) -> dict:
     """把 tailor 模型输出合并回完整 data 结构，保留事实字段不变。"""
     result = copy.deepcopy(flat_master)
 
-    # basics：只允许改 target_role
+    # basics：只允许改 target_role，并兼容旧的 target_position 命名。
     basics = result.get("basics", {})
-    if "basics" in tailored:
-        new_role = tailored["basics"].get("target_role")
-        if new_role:
-            basics["target_role"] = new_role
+    tailored_basics = tailored.get("basics") if isinstance(tailored.get("basics"), dict) else {}
+    target_role = _first_non_empty_text(
+        tailored_basics.get("target_role"),
+        tailored_basics.get("target_position"),
+        tailored.get("target_role"),
+        tailored.get("target_position"),
+        (jd_intent or {}).get("target_position"),
+        (jd_intent or {}).get("target_role"),
+        basics.get("target_role"),
+    )
+    if target_role:
+        basics["target_role"] = target_role
     result["basics"] = basics
 
     # profile：整段替换
@@ -289,6 +307,7 @@ def _merge_tailored(flat_master: dict, tailored: dict, jd_intent: dict) -> dict:
         "match_score": tailored.get("match_score", 0),
         "change_notes": tailored.get("change_notes", ""),
         "jd_intent": jd_intent,
+        "target_position": target_role,
     }
     return result
 
