@@ -1,4 +1,4 @@
-"""设置 — 个人画像 + 系统配置 + 测试连接。"""
+"""设置 — BYO-Key 与系统配置。"""
 
 import streamlit as st
 import os
@@ -13,9 +13,9 @@ from services.action_status import format_action_status_caption, get_all_action_
 from services.provider_health import ping_current_provider
 
 page_shell_header(
-    title="系统设置",
-    subtitle="配置个人画像、API 与系统路径",
-    right_hint=("AI Provider · 已连接" if settings.has_anthropic_key else "AI Provider · 未配置"),
+    title="你的 Key，你的数据，你掌控",
+    subtitle="自带 API Key 接入 Claude / OpenAI / Codex / Kimi，数据留在你的设备。",
+    right_hint=("BYO-Key · 已连接" if settings.has_anthropic_key else "BYO-Key · 待配置"),
 )
 
 # ══════════════════════════════════════════════════════════
@@ -183,6 +183,17 @@ _current_provider = (
 if _current_provider not in _PROVIDERS:
     _current_provider = "codex"
 
+_MAIN_PROVIDER_KEYS = ["anthropic", "openai", "codex", "kimi"]
+_EXTRA_PROVIDER_KEYS = ["glm", "deepseek", "proxy"]
+
+
+def _current_api_key() -> str:
+    return st.session_state.get("ANTHROPIC_API_KEY") or current_env.get("ANTHROPIC_API_KEY", "")
+
+
+def _provider_has_key(provider_key: str) -> bool:
+    return bool(_current_api_key() or (provider_key == "codex" and settings.codex_shared_key))
+
 # 云端 BYO-Key 提示
 if settings.demo_mode:
     alert_info(
@@ -190,21 +201,66 @@ if settings.demo_mode:
         "如需长期保存，建议本地部署：`git clone` 后在 `web/.env` 里填 Key。"
     )
 
-with st.form("api_config"):
-    provider_keys = list(_PROVIDERS.keys())
-    provider = st.selectbox(
-        "选择 LLM Provider",
-        options=provider_keys,
-        index=provider_keys.index(_current_provider),
-        format_func=lambda k: _PROVIDERS[k]["label"],
-        help="选对应的大模型服务商，会自动填入 base_url 和默认模型名。",
-    )
-    _p = _PROVIDERS[provider]
-    st.caption(f"💡 {_p['hint']}" + (f" [申请 Key →]({_p['key_link']})" if _p["key_link"] else ""))
+apple_section_heading(
+    "BYO-Key 模型管理",
+    subtitle="Claude / OpenAI / Codex / Kimi 四个主流模型优先展示，其他兼容端点放在折叠区。",
+)
+alert_info(
+    "你的 API Key 只保存在当前浏览器会话或本地 `.env`。留空不会覆盖现有 Key；切换模型只改变 provider、端点与默认模型。"
+)
 
-    # 安全：永不把真实 Key 预填到 input value（DOM 可读）
-    # 显示当前状态 + 掩码；用户留空则保留，输入新值才覆盖
-    _existing_key = st.session_state.get("ANTHROPIC_API_KEY") or current_env.get("ANTHROPIC_API_KEY", "")
+_provider_cols = st.columns(len(_MAIN_PROVIDER_KEYS))
+for col, pkey in zip(_provider_cols, _MAIN_PROVIDER_KEYS):
+    p = _PROVIDERS[pkey]
+    selected = pkey == _current_provider
+    has_key = _provider_has_key(pkey)
+    status_label = "● 已连接" if selected and has_key else ("当前使用" if selected else "可切换")
+    status_tone = "success" if selected and has_key else ("info" if selected else "muted")
+
+    with col:
+        st.markdown(f"**{p['label']}**")
+        st.caption(p["model"])
+        st.markdown(badge(status_label, status_tone), unsafe_allow_html=True)
+        if st.button(
+            "当前" if selected else "选择",
+            key=f"switch_provider_{pkey}",
+            type="secondary" if selected else "primary",
+            use_container_width=True,
+            disabled=selected,
+        ):
+            st.session_state["LLM_PROVIDER"] = pkey
+            st.session_state["ANTHROPIC_BASE_URL"] = p["base_url"]
+            st.session_state["CLAUDE_MODEL"] = p["model"]
+            record_action_status(st.session_state, "provider_switch", "success", f"已切换到 {p['label']}")
+            st.rerun()
+
+with st.expander("更多模型供应商", expanded=False):
+    for pkey in _EXTRA_PROVIDER_KEYS:
+        p = _PROVIDERS[pkey]
+        selected = pkey == _current_provider
+        c1, c2, c3 = st.columns([3, 4, 1.5])
+        with c1:
+            st.markdown(f"**{p['label']}**")
+        with c2:
+            st.caption(f"{p['model']} · {p['hint']}")
+        with c3:
+            if st.button(
+                "当前" if selected else "选择",
+                key=f"switch_extra_provider_{pkey}",
+                use_container_width=True,
+                disabled=selected,
+            ):
+                st.session_state["LLM_PROVIDER"] = pkey
+                st.session_state["ANTHROPIC_BASE_URL"] = p["base_url"]
+                st.session_state["CLAUDE_MODEL"] = p["model"]
+                record_action_status(st.session_state, "provider_switch", "success", f"已切换到 {p['label']}")
+                st.rerun()
+
+_p = _PROVIDERS[_current_provider]
+st.caption(f"正在配置：{_p['label']} · 默认模型 `{_p['model']}`" + (f" · [申请 Key →]({_p['key_link']})" if _p["key_link"] else ""))
+
+with st.form("api_config"):
+    _existing_key = _current_api_key()
     if _existing_key:
         st.caption(f"当前 Key：`{settings.masked_key(_existing_key)}` · 留空保持不变，输入新 Key 覆盖")
     api_key = st.text_input(
@@ -212,83 +268,49 @@ with st.form("api_config"):
         value="",
         type="password",
         placeholder="粘贴新 Key 或留空保持当前 Key",
-        help="BYO-Key 模式下只存在当前浏览器会话。留空保持现有 Key；输入非空值才会覆盖。",
+        help="留空保持现有 Key；输入非空值才会覆盖。",
     )
     base_url = st.text_input(
         "API 端点（base_url）",
         value=st.session_state.get("ANTHROPIC_BASE_URL") or current_env.get("ANTHROPIC_BASE_URL", "") or _p["base_url"],
-        help="留空用 Anthropic 官方。其他 provider 会自动填对应端点。",
+        help="留空用当前 provider 默认端点。",
         placeholder=_p["base_url"] or "https://api.anthropic.com",
     )
     model = st.text_input(
         "模型名称",
         value=st.session_state.get("CLAUDE_MODEL") or current_env.get("CLAUDE_MODEL", "") or _p["model"],
-        help="每家 provider 的可用模型名不同，参考下面提示",
+        help="每家 provider 的可用模型名不同。",
         placeholder=_p["model"],
     )
 
     if st.form_submit_button("保存 API 配置", type="primary"):
-        # BYO-Key / DEMO_MODE：只写 session_state（云端 FS 只读）
-        # 本地模式：同时写 session_state + .env（永久保存）
-        # API Key 特殊处理：留空保持现有，输入非空值才覆盖
         _api_key_effective = api_key.strip() if api_key and api_key.strip() else _existing_key
 
-        st.session_state["LLM_PROVIDER"]      = provider
+        st.session_state["LLM_PROVIDER"] = _current_provider
         st.session_state["ANTHROPIC_API_KEY"] = _api_key_effective
         st.session_state["ANTHROPIC_BASE_URL"] = base_url
-        st.session_state["CLAUDE_MODEL"]      = model
+        st.session_state["CLAUDE_MODEL"] = model
 
-        _can_write_env = not settings.demo_mode
-        if _can_write_env:
+        if not settings.demo_mode:
             try:
-                current_env["LLM_PROVIDER"]       = provider
-                current_env["ANTHROPIC_API_KEY"]  = _api_key_effective
+                current_env["LLM_PROVIDER"] = _current_provider
+                current_env["ANTHROPIC_API_KEY"] = _api_key_effective
                 current_env["ANTHROPIC_BASE_URL"] = base_url
-                current_env["CLAUDE_MODEL"]      = model
+                current_env["CLAUDE_MODEL"] = model
                 _write_env(current_env)
+                record_action_status(st.session_state, "provider_config_save", "success", f"已保存 {_p['label']} 到 .env")
                 alert_success(f"配置已保存到当前会话 + .env（Provider: {_p['label']}）")
             except Exception as e:
-                alert_success(f"配置已保存到当前会话（Provider: {_p['label']}）· .env 写入失败：{e}")
+                record_action_status(st.session_state, "provider_config_save", "warning", f"session 已保存，.env 写入失败：{e}")
+                alert_warning(f"配置已保存到当前会话（Provider: {_p['label']}）· .env 写入失败：{e}")
         else:
+            record_action_status(st.session_state, "provider_config_save", "success", f"已保存 {_p['label']} 到当前会话")
             alert_success(f"配置已保存到当前会话（Provider: {_p['label']}）· 关闭页面后清空")
-
-# 公开池状态（Codex 且用户没填 Key 时显示）
-_using_shared_pool = (
-    settings.llm_provider == "codex"
-    and not st.session_state.get("ANTHROPIC_API_KEY")
-    and bool(settings.codex_shared_key)
-)
-if _using_shared_pool:
-    try:
-        from services.llm_client import get_pool_spent_usd
-        _spent = get_pool_spent_usd()
-        alert_info(
-            f"**免费试用中** · 你正在使用 CareerOS 公开共享 Key（无需注册、无需填 Key、不做拦截）。"
-            f"本次会话已消耗约 `${_spent:.4f}` · 功能完全放开，不满意随时到这里填自己的 Key。"
-            f"[如需自己兑换 Key 请点这里 →](https://navacodex.shop/register)"
-        )
-    except Exception:
-        pass
-
-# 状态指示（用 badge 组件替代 emoji）
-if settings.has_anthropic_key:
-    _cur_p = _PROVIDERS.get(settings.llm_provider, _PROVIDERS["anthropic"])
-    st.markdown(
-        badge("已连接", "success") +
-        f' <span style="font-size:13px;color:#1d1d1f">{_cur_p["label"]} · {settings.masked_key(settings.anthropic_api_key)}</span>',
-        unsafe_allow_html=True,
-    )
-    if settings.has_custom_base_url:
-        st.caption(f"端点：{settings.anthropic_base_url}")
-    st.caption(f"当前模型：{settings.claude_model}")
-else:
-    st.markdown(badge("未配置", "danger"), unsafe_allow_html=True)
-    st.caption("填入 API Key 后才能使用 AI 生成功能。")
 
 # ── 测试连接按钮 ──────────────────────────────────────────
 col_test, _ = st.columns([1, 3])
 with col_test:
-    if st.button("测试连接", disabled=not settings.has_anthropic_key, help="发送一次最小 API 调用，验证 Key / 端点 / 模型是否可用"):
+    if st.button("测试连接", disabled=not _provider_has_key(_current_provider), help="发送一次最小 API 调用，验证 Key / 端点 / 模型是否可用"):
         record_action_status(st.session_state, "provider_ping", "running", "正在测试连接")
         result = ping_current_provider()
         if result.ok:
