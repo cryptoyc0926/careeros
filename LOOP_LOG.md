@@ -28,7 +28,7 @@ N | TIMESTAMP | VERDICT | TASK | COMMIT_OR_ROLLBACK | SCREENSHOT
 3 | 2026-04-23 04:08 | PASS | scroll reset 脚本迁 components.v1.html + selector 兼容 1.38+（section.main 多选器兜底） | a8cce90 | inline
 4 | 2026-04-23 04:17 | PASS | 隐藏 Streamlit 默认 Deploy 按钮 + 巡检 resume_tailor/history/master_resume/job_pool 4 页均正常 | cd0da62 | inline
 5 | 2026-04-23 04:25 | PASS | **P0 死链修复** 注册 jd_input/jd_browser/analytics 到 nav「求职工具」组，home 3 张卡 + hero "看数据分析" CTA 全部不再 404 | 777bce3 | inline
-6 | 2026-04-23 04:34 | PASS | 巡剩余 5 页（全正常或预期占位） + sidebar 禁 max-height 折叠让 13 项 nav 一屏全展开 | <待commit> | inline
+6 | 2026-04-23 04:34 | PASS | 巡剩余 5 页（全正常或预期占位） + sidebar 禁 max-height 折叠让 13 项 nav 一屏全展开 | b1db4d8 | inline
 ```
 
 ## 备注
