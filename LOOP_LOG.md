@@ -24,7 +24,7 @@ N | TIMESTAMP | VERDICT | TASK | COMMIT_OR_ROLLBACK | SCREENSHOT
 
 ```
 1 | 2026-04-23 03:48 | PASS | sidebar View more/less 本地化为「查看更多/收起」| 47c8aa8 | inline
-2 | 2026-04-23 04:00 | PARTIAL | home 卡片 href 追加 ?app=1 防 fallback 到 landing；完整 path routing 修复留给 ralph/3 | <待commit> | inline
+2 | 2026-04-23 04:00 | PARTIAL | home 卡片 href 追加 ?app=1 防 fallback 到 landing；完整 path routing 修复留给 ralph/3 | 51c7197 | inline
 ```
 
 ## 备注
