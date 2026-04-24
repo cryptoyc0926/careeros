@@ -9,6 +9,7 @@ from streamlit.testing.v1 import AppTest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from scripts.init_db import init_database  # noqa: E402
 from services import resume_tailor  # noqa: E402
 from services.ai_engine import AIError  # noqa: E402
 from services.resume_validator import ValidationError, ValidationIssue, ValidationReport  # noqa: E402
@@ -38,6 +39,19 @@ def _master_like(master: dict, *, profile: str, target_role: str | None = None, 
             "jd_intent": {"target_role": target_role} if target_role else {},
         },
     }
+
+
+def test_page_empty_db_shows_cta_to_create_master_resume(monkeypatch, tmp_path):
+    empty_db = tmp_path / "empty_resume_tailor.db"
+    init_database(empty_db)
+    monkeypatch.setenv("DB_PATH", str(empty_db))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+    at = AppTest.from_file(PAGE, default_timeout=30)
+    at.run()
+
+    assert "去创建主简历 →" in {button.label for button in at.button}
+    assert 'st.switch_page("pages/master_resume.py")' in Path(PAGE).read_text(encoding="utf-8")
 
 
 def test_page_generate_success_updates_canvas_target_role(monkeypatch):

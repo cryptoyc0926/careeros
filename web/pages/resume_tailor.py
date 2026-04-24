@@ -223,7 +223,11 @@ def flatten_master_for_render(master: dict) -> dict:
 
 master = load_master()
 if not master:
-    alert_info("主简历还没创建。请先到左侧「**主简历**」页面填写基本信息和经历，再回来使用定制功能。")
+    alert_info("主简历还没创建。先填写基本信息和经历，再回来使用定制功能。")
+    _btn_col_l, _btn_col_m, _btn_col_r = st.columns([1, 2, 1])
+    with _btn_col_m:
+        if st.button("去创建主简历 →", type="primary", use_container_width=True, key="rt_goto_master"):
+            st.switch_page("pages/master_resume.py")
     st.stop()
 demo_fallback_active = False
 if settings.demo_mode and master_needs_demo_fallback(master):
