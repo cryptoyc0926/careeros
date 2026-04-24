@@ -102,9 +102,9 @@ def demo_master_fallback() -> dict:
         "id": 0,
         "updated_at": "demo-fallback",
         "basics": {
-            "name": "杨 超",
-            "phone": "186-8795-0926",
-            "email": "bc1chao0926@gmail.com",
+            "name": "演示用户",
+            "phone": "138-0000-0000",
+            "email": "demo@example.com",
             "target_role": "AI 增长运营",
             "city": "杭州",
             "availability": "下周到岗",
@@ -172,8 +172,8 @@ def demo_master_fallback() -> dict:
         ],
         "education": [
             {
-                "school": "云南财经大学",
-                "major": "统计学",
+                "school": "示例大学",
+                "major": "示例专业",
                 "date": "2022.09 - 2026.07",
                 "bullets": ["核心课程：统计学、计量经济学、Python 数据分析、数据库原理。"],
             }
@@ -996,7 +996,7 @@ with _tb_right:
         st.markdown(
             '<div style="width:36px;height:36px;border-radius:50%;background:#EEF1F5;'
             'display:flex;align-items:center;justify-content:center;font-size:12px;'
-            'font-weight:700;color:#0B1220;">YC</div>',
+            'font-weight:700;color:#0B1220;">LM</div>',
             unsafe_allow_html=True,
         )
 st.markdown('<div style="height:8px;"></div>', unsafe_allow_html=True)
