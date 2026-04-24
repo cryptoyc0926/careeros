@@ -53,6 +53,39 @@ hero_intro_block(
 
 
 # ═════════════════════════════════════════════════════════════
+#  新手引导（仅当 DB 空时显示）
+# ═════════════════════════════════════════════════════════════
+_is_new_user = (jp_total == 0 and jp_p0 == 0 and jd_inter == 0 and jd_offer == 0)
+try:
+    _master_rows = query("SELECT COUNT(*) AS c FROM resume_master")
+    _has_master = bool(_master_rows) and _master_rows[0]["c"] > 0
+except Exception:
+    _has_master = False
+
+if _is_new_user:
+    apple_section_heading("新手三步")
+    g1, g2, g3 = st.columns(3, gap="medium")
+    with g1:
+        task_action_card(
+            "1. 填主简历",
+            "上传或手动填写你的 基本信息 / 项目 / 实习，作为定制底稿。" + (" ✓ 已完成" if _has_master else ""),
+            "pages/master_resume.py",
+        )
+    with g2:
+        task_action_card(
+            "2. 录第一个 JD",
+            "粘贴一段岗位 JD 原文，系统自动解析岗位要求与关键词。",
+            "pages/jd_input.py",
+        )
+    with g3:
+        task_action_card(
+            "3. 定制简历",
+            "选一个 JD，一键生成定制版简历并导出 PDF / Word。" + ("" if _has_master else "（先完成第 1 步）"),
+            "pages/resume_tailor.py",
+        )
+
+
+# ═════════════════════════════════════════════════════════════
 #  B. 今天的进度（叙事式 1 主 + 3 次）
 # ═════════════════════════════════════════════════════════════
 apple_section_heading("今天的进度")
