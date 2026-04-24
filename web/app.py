@@ -11,6 +11,52 @@ import streamlit as st
 from pathlib import Path
 from config import settings
 
+
+_DEEPLINK_SLUGS = {
+    "resume_tailor",
+    "history_versions",
+    "master_resume",
+    "resume_templates",
+    "job_pool",
+    "jd_input",
+    "jd_browser",
+    "analytics",
+    "star_pool",
+    "case_library",
+    "settings_page",
+    "help_feedback",
+}
+
+
+def _should_enter_app_from_request(query_params: object, raw_url: object) -> bool:
+    def _query_value_present(key: str) -> bool:
+        try:
+            value = query_params.get(key)
+        except Exception:
+            return False
+        return bool(value)
+
+    try:
+        if _query_value_present("app") or _query_value_present("page"):
+            return True
+    except Exception:
+        pass
+
+    try:
+        if any(str(key) in _DEEPLINK_SLUGS for key in query_params.keys()):
+            return True
+    except Exception:
+        pass
+
+    try:
+        from urllib.parse import urlparse
+
+        path = urlparse(str(raw_url or "")).path.rstrip("/")
+        path_slug = path.rsplit("/", 1)[-1] if path else ""
+        return path_slug in _DEEPLINK_SLUGS
+    except Exception:
+        return False
+
 # ── 页面配置（必须是第一个 Streamlit 调用）─────────────────
 st.set_page_config(
     page_title="Career OS",
@@ -699,10 +745,10 @@ except Exception as _init_err:
 if "entered_app" not in st.session_state:
     st.session_state["entered_app"] = False
 
-# 允许通过 query param 跳过 landing（开发/分享直达）
+# 允许通过 query param / page slug 跳过 landing（开发/分享直达）
 try:
-    _qp = st.query_params
-    if _qp.get("app") == "1":
+    _raw_url = getattr(getattr(st, "context", None), "url", None)
+    if _should_enter_app_from_request(st.query_params, _raw_url):
         st.session_state["entered_app"] = True
 except Exception:
     pass
