@@ -43,9 +43,9 @@ resume_canvas.render_canvas_css()
 st.markdown(
     """
     <style>
-    .main .block-container,
-    [data-testid="stAppViewBlockContainer"],
-    [data-testid="stMainBlockContainer"]{
+    section[data-testid="stMain"] > [data-testid="stMainBlockContainer"],
+    section[data-testid="stMain"] .block-container,
+    div[data-testid="stMainBlockContainer"]{
       max-width: none !important;
       width: 100% !important;
       padding: 1.5rem 2rem 3rem !important;

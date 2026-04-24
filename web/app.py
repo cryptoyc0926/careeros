@@ -174,7 +174,8 @@ html, body, [class*="css"], .stApp {
 
 /* ═══ 4. 主内容区（浅灰页面 + 宽度 1080）══════════════════════ */
 section[data-testid="stMain"] { background: #FFFFFF !important; }
-.main .block-container {
+section[data-testid="stMain"] > [data-testid="stMainBlockContainer"],
+[data-testid="stMain"] .block-container {
     padding-top: 2rem !important;
     padding-bottom: 3rem !important;
     max-width: 1080px !important;
