@@ -126,11 +126,14 @@ def _find_kw_hits(text: str, keywords: list[str]) -> list[tuple[int, int, str]]:
 SECTIONS = {
     "basics":      ["个人信息", "基本信息", "联系方式", "基础信息"],
     "profile":     [
-        "个人总结", "个人简介", "自我评价", "自我介绍", "个人评价", "自评",
+        "个人总结", "个人简介", "个人陈述", "自我评价", "自我介绍", "个人评价", "自评",
         "概述", "简介", "Summary", "About Me", "Profile",
     ],
     "education":   ["教育背景", "教育经历", "学习经历", "教育", "学历", "Education"],
-    "projects":    ["项目经历", "项目经验", "项目", "主要项目", "核心项目", "作品集", "Projects", "Project Experience"],
+    "projects":    [
+        "项目经历", "项目经验", "项目实践", "项目作品", "项目实战",
+        "项目", "主要项目", "核心项目", "作品集", "Projects", "Project Experience",
+    ],
     "internships": [
         "实习经历", "实习经验", "工作经历", "工作经验", "职业经历", "职业经验",
         "实习", "工作", "Internship", "Work Experience", "Experience",

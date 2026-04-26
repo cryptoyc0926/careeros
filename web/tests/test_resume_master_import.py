@@ -52,8 +52,27 @@ def test_should_not_persist_low_quality_parse_over_full_existing_master():
     decision = should_persist_parsed_resume(parsed_master, existing_master=FULL_EXISTING_MASTER, explicit_overwrite=False)
 
     assert not decision.persist
-    assert "个人总结为空" in decision.reason
     assert "项目经历为空" in decision.reason
+    assert "个人总结为空" not in decision.reason
+
+
+def test_should_persist_parse_when_only_profile_is_missing():
+    parsed_master = build_master_from_parsed(
+        {
+            "basics": {"name": "杨超"},
+            "profile": "",
+            "projects": [{"company": "CareerOS", "role": "产品与自动化实践", "date": "2026.04 - 至今", "bullets": ["搭建求职系统"]}],
+            "internships": [{"company": "Fancy Tech", "role": "运营", "date": "2024.06 - 2024.09", "bullets": ["做内容"]}],
+            "skills": [{"label": "AI 工具", "text": "Claude Code"}],
+            "education": [{"school": "浙江工商大学", "major": "应用统计", "date": "2022.09 - 2026.07"}],
+        },
+        existing_master=FULL_EXISTING_MASTER,
+    )
+
+    decision = should_persist_parsed_resume(parsed_master, existing_master=FULL_EXISTING_MASTER, explicit_overwrite=False)
+
+    assert decision.persist
+    assert not decision.low_quality
 
 
 def test_explicit_overwrite_can_persist_low_quality_parse():

@@ -8,6 +8,7 @@ from typing import Any
 class ResumeQuality:
     low_quality: bool
     reasons: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
     profile_chars: int = 0
     projects_count: int = 0
     internships_count: int = 0
@@ -89,10 +90,11 @@ def summarize_resume_quality(master: dict[str, Any]) -> ResumeQuality:
     basics = sanitized.get("basics") or {}
 
     reasons: list[str] = []
+    warnings: list[str] = []
     if not _text(basics.get("name")):
         reasons.append("姓名为空")
     if len(profile) < 20:
-        reasons.append("个人总结为空")
+        warnings.append("个人总结为空")
     if not projects:
         reasons.append("项目经历为空")
     if not internships:
@@ -103,6 +105,7 @@ def summarize_resume_quality(master: dict[str, Any]) -> ResumeQuality:
     return ResumeQuality(
         low_quality=bool(reasons),
         reasons=reasons,
+        warnings=warnings,
         profile_chars=len(profile),
         projects_count=len(projects),
         internships_count=len(internships),

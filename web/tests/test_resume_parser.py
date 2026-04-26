@@ -126,6 +126,26 @@ Fancy Tech 海外产品运营实习生 2024.06 — 2024.09
 """.strip()
 
 
+FIXTURE_D_HEADING_VARIANTS = """
+李默
+138-0000-0000 | demo@example.com
+
+个人陈述
+应用统计背景，擅长把复杂信息整理成能落地的增长动作。
+
+项目实践
+CareerOS 求职系统 产品与自动化实践 2026.04 - 至今
+• 搭建 JD 抓取、简历定制和评估工作流
+
+实习经历
+Fancy Tech 海外产品运营实习生 2024.06 - 2024.09
+• 负责内容增长和竞品调研
+
+教育背景
+示例大学 | 示例专业 | 2022.09 - 2026.07
+""".strip()
+
+
 # ═════════════════════════════════════════════════════════════════
 # Tests
 # ═════════════════════════════════════════════════════════════════
@@ -239,6 +259,14 @@ def test_fixture_c_full_upload_preserves_all_sections():
     assert len(r["skills"]) >= 2
     assert r["education"][0]["school"] == "浙江工商大学"
     assert "应用统计" in r["education"][0]["major"]
+
+
+def test_fixture_d_heading_variants_fill_profile_and_projects():
+    r = parse_resume_text(FIXTURE_D_HEADING_VARIANTS)
+    assert "应用统计背景" in r["profile"]
+    assert len(r["projects"]) == 1
+    assert r["projects"][0]["company"] == "CareerOS 求职系统"
+    assert r["projects"][0]["role"] == "产品与自动化实践"
 
 
 if __name__ == "__main__":
