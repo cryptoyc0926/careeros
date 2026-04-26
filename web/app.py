@@ -745,13 +745,20 @@ except Exception as _init_err:
     st.warning(f"数据库初始化遇到警告：{type(_init_err).__name__}: {_init_err}")
 
 
-# ── 公网部署隐私防护（DEMO_MODE 启动时清空所有用户私有数据表）─────
+# ── 公网部署隐私防护（DEMO_MODE 每个新 session 首次访问时清空用户数据）──
 # 背景：Streamlit Cloud 的 redeploy 是 rsync 模式，不删除非 git 文件，
 # 导致访客 A 上传的简历/联系人/投递记录会持久化在共享 SQLite 里，
-# 被访客 B/C 看到。公网部署必须每次启动 wipe 一次，强制每个 session
-# 从空 DB 开始。
+# 被访客 B/C 看到。
+#
+# 触发策略（关键 — 不能每次 rerun 都跑）：
+#   - 每次 Streamlit rerun 都会重跑 app.py 顶层代码
+#   - 如果无脑 wipe，用户刚上传/保存 → rerun → wipe → 数据立刻消失
+#   - 用 st.session_state 标记「本 session 首次访问已清过」
+#   - 新访客进来 = 新 session = 触发一次 wipe，清掉前任访客残留
+#   - 同 session 内的后续 rerun = 跳过 wipe，用户能正常编辑保存
+#
 # 仅清「用户私有」表，不动 jobs_pool / job_descriptions（公开抓取数据）。
-if settings.demo_mode:
+if settings.demo_mode and not st.session_state.get("_demo_wipe_done"):
     _SENSITIVE_TABLES = [
         "resume_master",       # 主简历（姓名/手机/邮箱）
         "resume_versions",     # 历史版本（含简历快照）
@@ -775,9 +782,12 @@ if settings.demo_mode:
         for _t in _SENSITIVE_TABLES:
             if _t in _existing:
                 _db_exec(f"DELETE FROM {_t}")
+        st.session_state["_demo_wipe_done"] = True
     except Exception as _wipe_err:
         # 清表失败不阻断启动，但要让管理员能看到
         st.warning(f"DEMO_MODE 隐私清理警告：{type(_wipe_err).__name__}: {_wipe_err}")
+        # 失败也标 done 避免反复 retry
+        st.session_state["_demo_wipe_done"] = True
 
 
 # ── 对外 Landing 路由 ──────────────────────────────────────
