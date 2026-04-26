@@ -178,3 +178,30 @@
 - [ ] PWA 离线模式
 - [ ] 社区功能（故事库共享 · 模板市场）
 - [ ] 移动端响应式
+
+## v0.4.0 — 2026-04-26 · 公网修复闭环
+
+### 4 大问题域全修
+1. **openai SDK 永久摘除**：`_OAClientStub` 替代 `openai.OpenAI()`，requirements.txt 移除依赖（核心调用早就走 httpx /v1/responses）
+2. **公网隐私防护**：DEMO_MODE 下每个浏览器 session 首次访问时 wipe 12 个用户私有表（rerun-safe，session 内不重复 wipe）
+3. **简历解析丢字段三连修**：NFKC unicode 归一化 + force_overwrite 强制覆盖 + 行内章节切分（long ≥4字符无前置边界 / short <4字符严格边界）
+4. **响应式宽度**：`max-width: 1080px` → `min(96vw, 1480px)`（27 寸屏从中间 1/3 → 充满 80%）
+
+### Quality 降级
+- projects/internships/education 缺失从 reasons → warnings（只有"姓名为空"才硬阻断 auto-save）
+- 应届生（无项目）/ 跨行业（无实习）的简历也能上传成功
+
+### AI 对话 4 处 bug
+- chat content `html.escape` 防 `<` `&` 破渲染
+- pending patch 渲染 try/except + 失败自动撤销
+- 显式 `intent == "error"` 分支让真错误可见
+- 兜底未知 intent
+
+### 删 PDF 预览
+- master_resume + resume_tailor 两处 base64 iframe expander 移除（保留 DB `original_docx_blob` 供 DOCX 重写）
+
+### 测试样本库
+- 新增 `OFFER/tests_samples/` 目录：3 PDF + 2 JD + 3 历史 JSON 样本，配 README
+
+### 提交链
+`7c6fd23 → bfd89b0 → a4aaa4d → 7700fa0 → fe26b5b → 97b0bec → 8013e29 → 8439c14 → e0d778d`
