@@ -282,24 +282,69 @@ def _normalize_text(text: str) -> str:
 
 
 def _explode_inline_section_headings(lines: list[str]) -> list[str]:
-    """把“个人总结 xxxxx”这类标题同行内容拆开，避免章节丢失。"""
-    heading_words = [kw for kws in SECTIONS.values() for kw in kws]
-    heading_words.sort(key=len, reverse=True)
-    heading_re = re.compile(r"^(" + "|".join(re.escape(x) for x in heading_words) + r")(?=\s|[:：]|$)", re.IGNORECASE)
+    """把章节标题从同行内容里拆开，避免章节丢失。
+
+    支持三种位置：
+    1. 行首：「个人总结 xxxxx」→ 「个人总结」+「xxxxx」
+    2. 行尾：「...到岗时间:下周到岗个人总结」→ 「...到岗时间:下周到岗」+「个人总结」
+    3. 行中：「xxx 个人总结 yyy」→ 「xxx」+「个人总结」+「yyy」
+
+    v0.4.0 Stage 4 升级：cloud pdfplumber 偶尔把章节标题嵌在 basics 行尾，
+    导致原 ^anchor 版本识别不到 → profile 段为空。"""
+    # 长词优先排序，避免「项目」先于「项目经历」匹配
+    all_heads = sorted(
+        {kw for kws in SECTIONS.values() for kw in kws},
+        key=len,
+        reverse=True,
+    )
+    # 长 heading（≥4 字符）：任意位置切分（不要求前置边界），避免中文连写
+    #   PDF 行尾紧贴「下周到岗个人总结」也能识别
+    long_heads = [w for w in all_heads if len(w) >= 4]
+    # 短 heading（<4 字符，如「项目」「技能」「学历」）：必须前后都是边界，
+    #   否则正文里的「项目」「技能」会被误切
+    short_heads = [w for w in all_heads if len(w) < 4]
+
+    long_pattern = re.compile(
+        r"(" + "|".join(re.escape(x) for x in long_heads) + r")"
+        r"(?=\s|[:：]|$|[、,，。;；])",
+        re.IGNORECASE,
+    ) if long_heads else None
+    short_pattern = re.compile(
+        r"(?:(?<=^)|(?<=[\s　、,，。;；:：|｜·-]))("
+        + "|".join(re.escape(x) for x in short_heads)
+        + r")(?=\s|[:：]|$|[、,，。;；])",
+        re.IGNORECASE,
+    ) if short_heads else None
 
     out: list[str] = []
     for raw in lines:
         line = raw.strip()
         if not line:
             continue
-        m = heading_re.match(line)
-        if m and len(line) > len(m.group(1)):
-            out.append(m.group(1))
-            rest = line[m.end():].strip(" :：-—–")
-            if rest:
-                out.append(rest)
-        else:
+        # 合并 long + short pattern 命中位置，按位置切分
+        spans: list[tuple[int, int, str]] = []
+        if long_pattern:
+            for m in long_pattern.finditer(line):
+                spans.append((m.start(), m.end(), m.group(1)))
+        if short_pattern:
+            for m in short_pattern.finditer(line):
+                # 避免与 long pattern 重叠
+                if not any(ls <= m.start() < le for ls, le, _ in spans):
+                    spans.append((m.start(), m.end(), m.group(1)))
+        spans.sort()
+        if not spans:
             out.append(line)
+            continue
+        last = 0
+        for start, end, kw in spans:
+            before = line[last:start].strip(" :：-—–·、,，")
+            if before:
+                out.append(before)
+            out.append(kw)
+            last = end
+        rest = line[last:].strip(" :：-—–·、,，")
+        if rest:
+            out.append(rest)
     return out
 
 
