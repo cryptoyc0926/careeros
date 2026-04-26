@@ -272,7 +272,11 @@ def _make_openai_client() -> OpenAICompatClient:
     try:
         from openai import OpenAI
     except ImportError as e:
-        raise RuntimeError("缺少 openai SDK，请运行 `pip install openai>=1.40`") from e
+        raise RuntimeError(
+            "AI 服务暂不可用：openai SDK 未安装。\n"
+            "• 如果你是访客：请等待管理员重启服务，或在「系统设置」切换到 anthropic provider 并填入 Key\n"
+            "• 如果你是管理员：到 Streamlit Cloud → Manage app → Reboot 触发依赖重装"
+        ) from e
 
     from config import settings
 
