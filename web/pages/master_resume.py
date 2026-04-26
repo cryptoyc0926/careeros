@@ -289,24 +289,9 @@ if st.session_state.pop("_just_saved", False):
 
 divider()
 
-# ── 原 PDF 预览（上传后的参照）─────────────────────────────
-if st.session_state.get("uploaded_pdf_bytes"):
-    import base64 as _b64
-    pdf_name = st.session_state.get("uploaded_pdf_name", "resume.pdf")
-    pdf_bytes = st.session_state["uploaded_pdf_bytes"]
-    _b64_data = _b64.b64encode(pdf_bytes).decode()
-    with st.expander(f"📄 原简历 PDF 预览（{pdf_name} · {len(pdf_bytes):,} 字节）· 点击展开", expanded=False):
-        st.markdown(
-            f'<iframe src="data:application/pdf;base64,{_b64_data}" '
-            f'width="100%" height="600px" style="border:1px solid rgba(11,18,32,0.08);border-radius:14px"></iframe>',
-            unsafe_allow_html=True,
-        )
-        col_clear, _ = st.columns([1, 4])
-        with col_clear:
-            if st.button("清除 PDF 缓存", key="clear_pdf_cache"):
-                st.session_state.pop("uploaded_pdf_bytes", None)
-                st.session_state.pop("uploaded_pdf_name", None)
-                st.rerun()
+# 注：原 PDF 预览组件已删除（v0.4.0 Stage 3）— iframe base64 渲染对大 PDF
+# 不稳，且 session_state 失效后会消失。原始 PDF 字节仍保存在 DB 的
+# original_docx_blob 字段，DOCX 重写功能照常使用。
 
 tab_basics, tab_profile, tab_projects, tab_intern, tab_skills, tab_edu, tab_upload = st.tabs(
     ["基本信息", "个人总结", "项目经历", "实习经历", "技能证书", "教育背景", "上传文件"]

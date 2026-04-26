@@ -610,7 +610,10 @@ def _render_chat_panel() -> None:
             role = msg["role"]
             klass = "cos-chat-user" if role == "user" else "cos-chat-bot"
             label = "你" if role == "user" else "AI"
-            content_html = msg.get("content", "")
+            # Stage 5 修复：content 必须 escape，否则用户输入含 <、& 等字符会破渲染
+            # 或被 sanitizer 当 HTML tag 解析（之前 chat 输入 "把 <项目> 改..." 会失效）
+            raw_content = msg.get("content", "")
+            content_html = html.escape(raw_content).replace("\n", "<br>")
             st.markdown(
                 f'<div class="cos-chat-msg {klass}"><div class="cos-chat-role">{label}</div>{content_html}</div>',
                 unsafe_allow_html=True,
@@ -627,7 +630,18 @@ def _render_chat_panel() -> None:
     pending = chat.get("pending")
     if pending and pending.get("patch"):
         alert_info(pending.get("explanation") or "准备修改（待确认）")
-        _render_patch_diff(pending["patch"], st.session_state.tailor_data)
+        # Stage 5 修复：patch 可能格式异常（AI 偶尔返回不合法 JSON path），
+        # 渲染失败不能让整页崩 — try/except 兜底 + 自动清掉坏 pending
+        try:
+            _render_patch_diff(pending["patch"], st.session_state.tailor_data)
+        except Exception as _patch_err:
+            alert_warning(
+                f"AI 返回的修改方案无法解析（{type(_patch_err).__name__}），"
+                "已自动撤销。可以重新告诉 AI 你想怎么改。"
+            )
+            clear_pending_patch(st.session_state)
+            pending = None
+    if pending and pending.get("patch"):
         pcol_a, pcol_b = st.columns(2)
         with pcol_a:
             if st.button("应用修改", type="primary",
@@ -708,8 +722,15 @@ def _render_chat_panel() -> None:
             assistant_meta["clarify_question"] = resp.get("clarify_question") or ""
             content = resp.get("explanation") or "需要先确认一下："
             record_action_status(st.session_state, "resume_tailor_chat", "clarify", content)
+        elif intent == "error":
+            # Stage 5 修复：单独 error 分支，让用户看到真实错误（之前落 else 没区分）
+            err_msg = resp.get("error") or resp.get("explanation") or "未知错误"
+            content = f"AI 暂时无法回应：{err_msg}"
+            assistant_meta["error"] = True
+            record_action_status(st.session_state, "resume_tailor_chat", "error", err_msg)
         else:
-            content = f"出错了：{resp.get('error') or resp.get('explanation')}"
+            # Unknown intent — 防御兜底
+            content = f"AI 返回了未识别的响应：{resp.get('explanation') or resp.get('error') or '空响应'}"
             record_action_status(st.session_state, "resume_tailor_chat", "error", content)
         append_chat_message(st.session_state, "assistant", content, meta=assistant_meta)
         st.rerun()
@@ -1774,14 +1795,4 @@ with col_ats:
     resume_canvas.group_label("导出")
     _render_export_controls()
     _render_save_version()
-
-    _orig_pdf = st.session_state.get("uploaded_pdf_bytes")
-    if _orig_pdf:
-        import base64 as _b64
-        with st.expander(f"原简历 PDF 对照（{len(_orig_pdf):,} 字节）", expanded=False):
-            _b64_s = _b64.b64encode(_orig_pdf).decode()
-            st.markdown(
-                f'<iframe src="data:application/pdf;base64,{_b64_s}" '
-                f'width="100%" height="500px" style="border:1px solid {_BORDER};border-radius:14px"></iframe>',
-                unsafe_allow_html=True,
-            )
+    # 注：原 PDF 对照组件已删除（v0.4.0 Stage 3）。

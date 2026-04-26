@@ -172,13 +172,17 @@ html, body, [class*="css"], .stApp {
 [data-testid="stSidebarNav"] a { color: #6B7280 !important; border-radius: 6px !important; }
 [data-testid="stSidebarNav"] a:hover { color: #0B1220 !important; background: rgba(11,18,32,0.03) !important; }
 
-/* ═══ 4. 主内容区（浅灰页面 + 宽度 1080）══════════════════════ */
+/* ═══ 4. 主内容区（浅灰页面 + 响应式宽度）═════════════════════ */
+/* v0.4.0 Stage 6：max-width 从硬编码 1080 改为响应式
+ * - 小屏（<1100px viewport）：96vw 充分利用宽度
+ * - 大屏（27 寸 / 4K）：上限 1480px，防止字行过长伤阅读
+ * resume_tailor.py 自身用 1480 不受影响（同源协调） */
 section[data-testid="stMain"] { background: #FFFFFF !important; }
 section[data-testid="stMain"] > [data-testid="stMainBlockContainer"],
 [data-testid="stMain"] .block-container {
     padding-top: 2rem !important;
     padding-bottom: 3rem !important;
-    max-width: 1080px !important;
+    max-width: min(96vw, 1480px) !important;
     background: transparent !important;
 }
 .stMainBlockContainer { background: transparent !important; }
