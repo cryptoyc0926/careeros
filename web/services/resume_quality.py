@@ -91,16 +91,20 @@ def summarize_resume_quality(master: dict[str, Any]) -> ResumeQuality:
 
     reasons: list[str] = []
     warnings: list[str] = []
+    # v0.4.0 收尾：reasons 阻断 auto-save，warnings 仅 UI 提示。
+    # 之前所有段缺失都阻断保存 → 用户上传后看不到自己数据。
+    # 改为只对「姓名为空」做硬阻断（说明上传的根本不是简历），其他段缺失
+    # 仅给 warnings 让用户感知但不阻挡数据落库。
     if not _text(basics.get("name")):
         reasons.append("姓名为空")
     if len(profile) < 20:
         warnings.append("个人总结为空")
     if not projects:
-        reasons.append("项目经历为空")
+        warnings.append("项目经历为空")
     if not internships:
-        reasons.append("实习经历为空")
+        warnings.append("实习经历为空")  # 降级：应届生可能只有教育段
     if not education:
-        reasons.append("教育背景为空")
+        warnings.append("教育背景为空")  # 降级：偶发解析问题不阻断
 
     return ResumeQuality(
         low_quality=bool(reasons),
