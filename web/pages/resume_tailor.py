@@ -182,22 +182,35 @@ def demo_master_fallback() -> dict:
 
 
 def master_needs_demo_fallback(master: dict) -> bool:
-    def _bad_text(value: object) -> bool:
-        text = str(value or "").strip()
-        compact = text.replace("*", "").replace("-", "").replace("—", "").strip()
-        return not compact or text.startswith("****")
+    """是否需要 demo 数据兜底。
 
-    basics = master.get("basics", {})
-    if _bad_text(basics.get("name")) or str(basics.get("name", "")).startswith("你的"):
-        return True
-    for section in ("projects", "internships"):
-        items = master.get(section) or []
-        if not items:
-            return True
-        for item in items:
-            if _bad_text(item.get("company")) or _bad_text(item.get("role")):
-                return True
-    return False
+    收紧到「真完全空白」才触发：
+    - 有真实姓名 → 一律放行（哪怕 projects/internships 不全也保留用户数据）
+    - 无姓名但有任何一段经历/教育 → 也放行（用户在填的过程中）
+    - 完全空白（无姓名 AND 无任何 project/internship/education）→ 才用 demo
+
+    这样修复：用户上传简历后即使解析不完整，也不会被「演示用户」整体覆盖。
+    """
+    basics = master.get("basics", {}) or {}
+    name = str(basics.get("name", "") or "").strip()
+
+    # 真实姓名（非占位符）→ 直接放行
+    if name and not name.startswith("你的") and not name.startswith("****"):
+        return False
+
+    # 无姓名但已有任何一段实质内容 → 也放行（说明用户已开始填）
+    has_content = any([
+        master.get("projects"),
+        master.get("internships"),
+        master.get("education"),
+        (basics.get("phone") or "").strip(),
+        (basics.get("email") or "").strip(),
+    ])
+    if has_content:
+        return False
+
+    # 真·完全空白 → 用 demo 兜底
+    return True
 
 
 def flatten_master_for_render(master: dict) -> dict:
