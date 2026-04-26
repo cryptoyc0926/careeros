@@ -13,6 +13,7 @@ v2 改进：
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Any
 
 
@@ -266,7 +267,15 @@ def _split_sections(text: str) -> dict[str, list[str]]:
 
 
 def _normalize_text(text: str) -> str:
-    """清理 PDF/DOCX 提取常见空白，尽量保留原文行结构。"""
+    """清理 PDF/DOCX 提取常见空白，尽量保留原文行结构。
+
+    v0.4.0 Stage 4 修复：加 NFKC unicode 归一化。原因：
+    某些 PDF 字体子集化后，pdfplumber 输出会含康熙部首字符（U+2F00-2FDF），
+    例如⼷⼀⼟（看起来跟工大生一样但 codepoint 不同），
+    导致章节关键词如「项目经历」「个人总结」无法匹配 → 整段 fallback 到 profile
+    或被丢弃。NFKC 把这些部首替换回正常汉字，恢复关键词匹配。"""
+    # NFKC 归一化：Kangxi Radicals → 普通汉字 + 全形 → 半形 + 兼容字符 → 标准
+    text = unicodedata.normalize("NFKC", text or "")
     text = text.replace("\u00a0", " ").replace("\u3000", " ")
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     return "\n".join(re.sub(r"[ \t]+", " ", ln).strip() for ln in text.split("\n"))

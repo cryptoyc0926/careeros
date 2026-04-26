@@ -512,7 +512,11 @@ with tab_upload:
                 try:
                     from services.resume_rule_parser import parse_resume_text as rule_parse
                     parsed = rule_parse(text)
-                    persisted = _apply_parsed(parsed)
+                    # v0.4.0 Stage 4: explicit_overwrite=True — 上传 = 替换意图
+                    # 之前 quality 低 + existing 高 → 不覆盖 → 用户上传完看到旧数据，
+                    # 误以为上传失败。改为永远覆盖：用户上传就是想用新文件，
+                    # 即使解析不全也比保留无关旧数据好（用户能立刻发现问题去修）。
+                    persisted = _apply_parsed(parsed, explicit_overwrite=True)
                     candidate = st.session_state["_last_parsed_master_candidate"]
                     summary, low_quality = _parse_summary(candidate)
                     st.session_state["_resume_upload_auto_parse_sig"] = file_sig
