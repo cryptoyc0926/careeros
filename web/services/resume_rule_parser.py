@@ -266,16 +266,61 @@ def _split_sections(text: str) -> dict[str, list[str]]:
     return result
 
 
+def _build_kcs_to_cjk_map() -> dict[int, str]:
+    """构建 CJK Radicals Supplement (U+2E80-U+2EFF) → CJK 本字的映射。
+
+    背景：NFKC 只对 Kangxi Radicals (U+2F00-U+2FDF) 有 compatibility
+    decomposition，不覆盖 KCS 区段。但 cloud pdfplumber 的字体子集化
+    会把常用字（如「目」）抽成 KCS 区段的等价部首字符（如 ⺫ U+2EAB）。
+
+    实现：通过 unicodedata.name() 在两区段之间按 radical 名字反查，
+    借 Kangxi 的 NFKC 行为得到本字。
+        U+2EAB 'CJK RADICAL EYE' ──name──→ 'KANGXI RADICAL EYE' (U+2F6C)
+                                            │ NFKC
+                                            ↓
+                                          '目' (U+76EE)
+    结果 {0x2EAB: '目'} 等 32 个映射（KCS 区段中能与 Kangxi 同名 radical
+    配对的子集；剩余 ~80 个 KCS 独有变体没有标准 NFKC 路径，按需再补）。
+    零依赖、跟 Python unicodedata 自动同步。
+    """
+    kangxi_by_radical: dict[str, str] = {}
+    for cp in range(0x2F00, 0x2FE0):
+        name = unicodedata.name(chr(cp), "")
+        if not name.startswith("KANGXI RADICAL "):
+            continue
+        radical = name[len("KANGXI RADICAL "):]
+        decomp = unicodedata.normalize("NFKC", chr(cp))
+        if decomp and decomp != chr(cp):
+            kangxi_by_radical[radical] = decomp
+
+    mapping: dict[int, str] = {}
+    for cp in range(0x2E80, 0x2F00):
+        name = unicodedata.name(chr(cp), "")
+        if not name.startswith("CJK RADICAL "):
+            continue
+        radical = name[len("CJK RADICAL "):]
+        if radical in kangxi_by_radical:
+            mapping[cp] = kangxi_by_radical[radical]
+    return mapping
+
+
+_KCS_TO_CJK: dict[int, str] = _build_kcs_to_cjk_map()
+
+
 def _normalize_text(text: str) -> str:
     """清理 PDF/DOCX 提取常见空白，尽量保留原文行结构。
 
-    v0.4.0 Stage 4 修复：加 NFKC unicode 归一化。原因：
-    某些 PDF 字体子集化后，pdfplumber 输出会含康熙部首字符（U+2F00-2FDF），
-    例如⼷⼀⼟（看起来跟工大生一样但 codepoint 不同），
-    导致章节关键词如「项目经历」「个人总结」无法匹配 → 整段 fallback 到 profile
-    或被丢弃。NFKC 把这些部首替换回正常汉字，恢复关键词匹配。"""
-    # NFKC 归一化：Kangxi Radicals → 普通汉字 + 全形 → 半形 + 兼容字符 → 标准
+    v0.4.0 Stage 4：NFKC 归一化（Kangxi Radicals U+2F00-U+2FDF → 本字 + 全形→半形）。
+    某些 PDF 字体子集化后输出康熙部首字符，导致章节关键词「项目经历」「个人总结」
+    无法匹配 → 整段 fallback 到 profile 或被丢弃。
+
+    v0.4.1：补 KCS 区段映射（见 _build_kcs_to_cjk_map）。NFKC 漏掉了 CJK Radicals
+    Supplement (U+2E80-U+2EFF)，cloud pdfplumber 偶尔把「目」抽成 ⺫(U+2EAB)，
+    引发 profile 末尾「项⺫ /」残留。translate(_KCS_TO_CJK) 兜底。"""
+    # NFKC 归一化：Kangxi Radicals (U+2F00-U+2FDF) → 普通汉字 + 全形 → 半形 + 兼容字符
+    # v0.4.1：translate 兜底 CJK Radicals Supplement (U+2E80-U+2EFF)，NFKC 漏掉的区段
     text = unicodedata.normalize("NFKC", text or "")
+    text = text.translate(_KCS_TO_CJK)
     text = text.replace("\u00a0", " ").replace("\u3000", " ")
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     return "\n".join(re.sub(r"[ \t]+", " ", ln).strip() for ln in text.split("\n"))
