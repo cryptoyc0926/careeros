@@ -50,3 +50,6 @@
 2026-04-22T14:49:59-0600 · codex · L-2 · DONE · AI Chat section 已按 Image 3 重写：助手面板、diff 红绿预览、4 feature chips、只读完整简历预览；py_compile + Chrome AX/样式截图验收通过，待 Claude preview 裁决后再 commit
 2026-04-22T15:06:37-0600 · codex · L-3 · DONE · Kanban section 已按 Image 4 重写：视觉 sidebar mock、4 列看板、百度 JD drawer；py_compile + Chrome DOM/布局截图验收通过，未改真实路由，待 Claude preview 裁决后再 commit
 2026-04-22T15:18:52-0600 · codex · L-4 · DONE · BYO-Key section 已按 Image 5 重写：3 tabs、模型 Key 管理、下载与版本历史、3 个 value tile；py_compile + Chrome DOM/截图验收通过，待 Claude preview 裁决后再 commit
+
+2026-04-26T06:20 · claude · v0.4.0-S5+ · 摘除 openai SDK 依赖 · llm_client.py:_make_openai_client 用 _OAClientStub 替代 openai.OpenAI 容器（底层 httpx 直连 /v1/responses，SDK 本来就没必要）。requirements.txt 删 openai 行。本地测试 mock openai=None 仍能 make_client OK。Cloud 上「RuntimeError: openai SDK 未安装」根治 — 不再依赖 pip 装 openai。
+2026-04-26T06:25 · claude · CODEX-COLLAB-REQ · 求 Codex 协同 v0.4.0 收尾 · 任务 1：用本地 PDF（/Users/Zhuanz/Desktop/OFFER/tests_samples/resume_pdfs/1_最终版.pdf）+ JD（jd/jd_001_minimax_growth.md）跑端到端，验证 generate_tailored_resume 调通；任务 2：跑 chat 流程（resume_chat.handle_user_message）测 5 个 intent；任务 3：检查 resume_quality.py 的「项目经历为空」是否仍是 reasons（应降到 warnings）。结果写在 NOTES_CODEX.md 同一行下面。

@@ -268,16 +268,22 @@ def make_client():
     return Anthropic(**kwargs)
 
 
-def _make_openai_client() -> OpenAICompatClient:
-    try:
-        from openai import OpenAI
-    except ImportError as e:
-        raise RuntimeError(
-            "AI 服务暂不可用：openai SDK 未安装。\n"
-            "• 如果你是访客：请等待管理员重启服务，或在「系统设置」切换到 anthropic provider 并填入 Key\n"
-            "• 如果你是管理员：到 Streamlit Cloud → Manage app → Reboot 触发依赖重装"
-        ) from e
+class _OAClientStub:
+    """轻量 stub — 替代 openai.OpenAI 对象，仅持有 api_key + base_url。
 
+    v0.4.0 Stage 5+ 修复：底层 _MessagesProxy.create 已经用 httpx 直接调
+    /v1/responses，根本不需要 OpenAI SDK 真正发起请求。但旧代码仍 import openai
+    创建容器对象，导致 cloud pip install openai 失败时整个 chat / 定制全崩。
+    现在用此 stub 替代，彻底剥离 openai SDK 依赖（httpx 是 streamlit 自带依赖）。"""
+    __slots__ = ("api_key", "base_url")
+
+    def __init__(self, api_key: str, base_url: str | None):
+        self.api_key = api_key
+        # 默认走 OpenAI 官方端点（_MessagesProxy 取 self._oa.base_url 时用）
+        self.base_url = base_url or "https://api.openai.com/v1"
+
+
+def _make_openai_client() -> OpenAICompatClient:
     from config import settings
 
     # 优先用用户自己的 Key（BYO-Key），没填则 fallback 到公开池 Shared Key
@@ -294,7 +300,7 @@ def _make_openai_client() -> OpenAICompatClient:
         )
 
     base_url = settings.anthropic_base_url
-    oa_client = OpenAI(api_key=user_key, base_url=base_url or None)
+    oa_client = _OAClientStub(api_key=user_key, base_url=base_url)
     return OpenAICompatClient(oa_client, using_shared_pool=using_shared)
 
 
