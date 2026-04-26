@@ -741,6 +741,41 @@ except Exception as _init_err:
     st.warning(f"数据库初始化遇到警告：{type(_init_err).__name__}: {_init_err}")
 
 
+# ── 公网部署隐私防护（DEMO_MODE 启动时清空所有用户私有数据表）─────
+# 背景：Streamlit Cloud 的 redeploy 是 rsync 模式，不删除非 git 文件，
+# 导致访客 A 上传的简历/联系人/投递记录会持久化在共享 SQLite 里，
+# 被访客 B/C 看到。公网部署必须每次启动 wipe 一次，强制每个 session
+# 从空 DB 开始。
+# 仅清「用户私有」表，不动 jobs_pool / job_descriptions（公开抓取数据）。
+if settings.demo_mode:
+    _SENSITIVE_TABLES = [
+        "resume_master",       # 主简历（姓名/手机/邮箱）
+        "resume_versions",     # 历史版本（含简历快照）
+        "generated_resumes",   # 已生成定制版（含真实简历内容）
+        "applications",        # 投递记录
+        "contacts",            # 联系人（隐私）
+        "linkedin_leads",      # LinkedIn 候选
+        "email_queue",         # 邮件草稿
+        "interview_prep",      # 面试材料
+        "interview_qa",        # 面试问答
+        "star_pool",           # STAR 故事池
+        "star_stories",        # STAR 故事
+        "jd_evaluations",      # JD 评估（用户主观打分）
+    ]
+    try:
+        from models.database import execute as _db_exec, query as _db_query
+        # 先看哪些表存在（schema 版本可能差异），再清
+        _existing = {r["name"] for r in _db_query(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        )}
+        for _t in _SENSITIVE_TABLES:
+            if _t in _existing:
+                _db_exec(f"DELETE FROM {_t}")
+    except Exception as _wipe_err:
+        # 清表失败不阻断启动，但要让管理员能看到
+        st.warning(f"DEMO_MODE 隐私清理警告：{type(_wipe_err).__name__}: {_wipe_err}")
+
+
 # ── 对外 Landing 路由 ──────────────────────────────────────
 # 未 entered_app → 显示 Landing 官网；点 CTA 后 entered_app=True 走工作台
 if "entered_app" not in st.session_state:
