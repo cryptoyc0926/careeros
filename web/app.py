@@ -28,6 +28,72 @@ _DEEPLINK_SLUGS = {
 }
 
 
+def _requested_deeplink_slug(query_params: object, raw_url: object) -> str | None:
+    try:
+        page_value = query_params.get("page")
+        if isinstance(page_value, list):
+            page_value = page_value[0] if page_value else None
+        page_slug = str(page_value or "").strip()
+        if page_slug in _DEEPLINK_SLUGS:
+            return page_slug
+    except Exception:
+        pass
+
+    try:
+        for key in query_params.keys():
+            key_slug = str(key)
+            if key_slug in _DEEPLINK_SLUGS:
+                return key_slug
+    except Exception:
+        pass
+
+    try:
+        from urllib.parse import urlparse
+
+        path = urlparse(str(raw_url or "")).path.rstrip("/")
+        path_slug = path.rsplit("/", 1)[-1] if path else ""
+        if path_slug in _DEEPLINK_SLUGS:
+            return path_slug
+    except Exception:
+        pass
+    return None
+
+
+def _requested_default_page_slug(query_params: object, raw_url: object) -> str | None:
+    requested_slug = _requested_deeplink_slug(query_params, raw_url)
+    if not requested_slug:
+        return None
+
+    try:
+        from urllib.parse import urlparse
+
+        path = urlparse(str(raw_url or "")).path.rstrip("/")
+        is_root_request = path in ("", "/")
+    except Exception:
+        return None
+
+    if not is_root_request:
+        return None
+
+    try:
+        page_value = query_params.get("page")
+        if isinstance(page_value, list):
+            page_value = page_value[0] if page_value else None
+        if str(page_value or "").strip() == requested_slug:
+            return requested_slug
+    except Exception:
+        pass
+
+    try:
+        for key in query_params.keys():
+            if str(key) == requested_slug:
+                return requested_slug
+    except Exception:
+        pass
+
+    return None
+
+
 def _should_enter_app_from_request(query_params: object, raw_url: object) -> bool:
     def _query_value_present(key: str) -> bool:
         try:
@@ -47,15 +113,7 @@ def _should_enter_app_from_request(query_params: object, raw_url: object) -> boo
             return True
     except Exception:
         pass
-
-    try:
-        from urllib.parse import urlparse
-
-        path = urlparse(str(raw_url or "")).path.rstrip("/")
-        path_slug = path.rsplit("/", 1)[-1] if path else ""
-        return path_slug in _DEEPLINK_SLUGS
-    except Exception:
-        return False
+    return _requested_deeplink_slug(query_params, raw_url) is not None
 
 # ── 页面配置（必须是第一个 Streamlit 调用）─────────────────
 st.set_page_config(
@@ -796,8 +854,10 @@ if "entered_app" not in st.session_state:
     st.session_state["entered_app"] = False
 
 # 允许通过 query param / page slug 跳过 landing（开发/分享直达）
+_requested_default_slug = None
 try:
     _raw_url = getattr(getattr(st, "context", None), "url", None)
+    _requested_default_slug = _requested_default_page_slug(st.query_params, _raw_url)
     if _should_enter_app_from_request(st.query_params, _raw_url):
         st.session_state["entered_app"] = True
 except Exception:
@@ -854,27 +914,27 @@ if settings.demo_mode:
 # ── 导航 ──────────────────────────────────────────────────
 pages = {
     "": [
-        st.Page("pages/home.py", title="总览", default=True),
+        st.Page("pages/home.py", title="总览", default=_requested_default_slug is None),
     ],
     "简历定制": [
-        st.Page("pages/resume_tailor.py",    title="在线定制"),
-        st.Page("pages/history_versions.py", title="历史版本"),
-        st.Page("pages/master_resume.py",    title="简历管理"),
-        st.Page("pages/resume_templates.py", title="简历模板"),
+        st.Page("pages/resume_tailor.py",    title="在线定制", default=_requested_default_slug == "resume_tailor"),
+        st.Page("pages/history_versions.py", title="历史版本", default=_requested_default_slug == "history_versions"),
+        st.Page("pages/master_resume.py",    title="简历管理", default=_requested_default_slug == "master_resume"),
+        st.Page("pages/resume_templates.py", title="简历模板", default=_requested_default_slug == "resume_templates"),
     ],
     "求职工具": [
-        st.Page("pages/job_pool.py",   title="岗位池"),
-        st.Page("pages/jd_input.py",   title="添加 JD"),
-        st.Page("pages/jd_browser.py", title="浏览 JD"),
-        st.Page("pages/analytics.py",  title="数据分析"),
+        st.Page("pages/job_pool.py",   title="岗位池", default=_requested_default_slug == "job_pool"),
+        st.Page("pages/jd_input.py",   title="添加 JD", default=_requested_default_slug == "jd_input"),
+        st.Page("pages/jd_browser.py", title="浏览 JD", default=_requested_default_slug == "jd_browser"),
+        st.Page("pages/analytics.py",  title="数据分析", default=_requested_default_slug == "analytics"),
     ],
     "资源中心": [
-        st.Page("pages/star_pool.py",    title="素材库"),
-        st.Page("pages/case_library.py", title="案例库"),
+        st.Page("pages/star_pool.py",    title="素材库", default=_requested_default_slug == "star_pool"),
+        st.Page("pages/case_library.py", title="案例库", default=_requested_default_slug == "case_library"),
     ],
     "系统": [
-        st.Page("pages/settings_page.py", title="设置"),
-        st.Page("pages/help_feedback.py", title="帮助反馈"),
+        st.Page("pages/settings_page.py", title="设置", default=_requested_default_slug == "settings_page"),
+        st.Page("pages/help_feedback.py", title="帮助反馈", default=_requested_default_slug == "help_feedback"),
     ],
 }
 
