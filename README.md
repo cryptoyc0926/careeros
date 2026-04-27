@@ -7,7 +7,7 @@
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.38%2B-ff4b4b)](https://streamlit.io/)
 [![Claude](https://img.shields.io/badge/Claude_API-Anthropic-9d6cff)](https://www.anthropic.com/)
 [![OpenAI](https://img.shields.io/badge/OpenAI-compatible-10a37f)](https://platform.openai.com/)
-[![Version](https://img.shields.io/badge/version-v0.3.0-blueviolet)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v0.6.0-blueviolet)](./CHANGELOG.md)
 
 ---
 
@@ -22,7 +22,9 @@
 
 所有数据都在你自己的电脑上（SQLite 单文件），API Key 也是你自己的，作者看不到任何东西。
 
-**支持的 LLM Provider**（v0.3.0 起，设置页下拉切换）：
+**公网 demo 隐私契约**（[careeros-chad.streamlit.app](https://careeros-chad.streamlit.app)）：每个新浏览器 session 启动时自动 wipe 12 张用户私有表（简历 / 投递 / 联系人 / 邮件队列 / 面试题等），同 session 内自由编辑保存，关掉浏览器或换设备 = 不见前任访客数据。
+
+**支持的 LLM Provider**（v0.6.0 起，设置页下拉切换 · `openai` SDK pip 依赖已摘除，所有 OpenAI-wire provider 走原生 `httpx` 直连，部署不再因 SDK 安装失败而报错）：
 
 | Provider | 协议 | 默认模型 | 场景 |
 |---|---|---|---|
@@ -35,7 +37,7 @@
 
 ## 截图
 
-> Nature × Apple 设计语言，17 个页面 / 29 个组件。下面 6 张图对应 README 后文提到的核心能力。
+> Nature × Apple 设计语言，14 个页面。下面 7 张图对应 README 后文提到的核心能力。
 
 ### 首页 · 今天该做什么
 ![首页](docs/screenshots/home.png)
@@ -53,9 +55,13 @@
 ![简历定制](docs/screenshots/resume_tailor.png)
 左栏贴 JD、中栏改段落、右栏 1:1 预览新 PDF（可与原始 PDF 对照）。历史版本自动沉淀。
 
-### 投递看板 · 6 × 2 状态列
-![看板](docs/screenshots/pipeline.png)
-已收藏 → 已生成简历 → 已投递 → 跟进中 → 面试中 → Offer，外加终态（已拒绝 / 已放弃）。
+### 投递追踪 · 岗位池 + 多维过滤
+![岗位池](docs/screenshots/pipeline.png)
+五维状态卡片（待处理 / P0 重点 / 已投递 / 有效岗位 / 已录 JD）+ 优先级与状态过滤芯片，按 fit_score 排序。
+
+### 历史版本 · 一份 JD 多次 tailor 全留痕
+![历史版本](docs/screenshots/history_versions.png)
+每次定制都自动归档，可对比、可回滚、可批量导出。
 
 ### 数据分析 · 漏斗诊断转化
 ![分析](docs/screenshots/analytics.png)
@@ -98,7 +104,7 @@ streamlit run web/app.py
 | 模块 | 能力 |
 |---|---|
 | 🎯 **JD 入库** | 4 种方式：粘贴链接（支持 Moka/飞书）/ AI 智能解析 / 手动 / 上传 PDF |
-| 📝 **简历定制** | AI 按 JD 改写主简历，保留硬事实不编造，生成 match_score |
+| 📝 **简历定制** | AI 按 JD 改写主简历，保留硬事实不编造，生成 match_score；内置写作规则四件套（加粗 / 排版 / STAR 6 步法 / 5 槽位个人总结） |
 | 📊 **投递追踪** | 看板（已收藏/已投递/跟进中/面试/Offer）+ 漏斗 + 转化率诊断 |
 | 💬 **面试准备** | STAR 故事库 / 八股题 / 群面题 / 牛客面经导入 |
 | 📧 **邮件模板** | 内推 / 投递 / 跟进 三类话术一键生成（从你的个人画像注入）|
@@ -118,7 +124,7 @@ streamlit run web/app.py
 
 ## 技术栈
 
-- **Frontend**：Streamlit 1.38+（17 个页面 / 29 个 Apple 风组件）
+- **Frontend**：Streamlit 1.38+（14 个页面 / Nature × Apple 设计语言）
 - **AI**：Anthropic Claude（Opus/Sonnet）+ OpenAI 兼容层（Codex 公开池 / GPT 系列）
 - **Storage**：SQLite（纯文件，零依赖）· 数据库 schema 19 张表
 - **PDF**：WeasyPrint + Jinja2（自定义 resume 模板）
@@ -153,7 +159,6 @@ streamlit run web/app.py
 | **云端 API Key 存储** | 关闭浏览器 session 就清空 | BYO-Key 模式设计如此（作者零成本，用户零信任风险） |
 | **中国区招聘网站抓取** | BOSS/猎聘/飞书等需 Playwright | 本地部署可装；云端不支持，改用「智能粘贴」或「关键词搜索」 |
 | **简历上传自动填** | 对**部分格式**可能漏字段 | 能识别 90%+ 标准格式；特殊格式切 AI 解析或手动补 |
-| **英文版 / i18n** | 🚧 0.4.0 roadmap | 本版本专注华语区求职者 |
 
 遇到解析出错的简历 / 用起来有反直觉的地方，欢迎 [提 issue](https://github.com/cryptoyc0926/careeros/issues) 附：
 1. 失败的简历 PDF（可先去隐私化）
